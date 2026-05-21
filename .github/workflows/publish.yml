@@ -33,9 +33,6 @@ jobs:
     - name: Pack NuGet package
       run: dotnet pack --configuration Release --no-build --output .
 
-    - name: Verify package created
-      run: ls -la *.nupkg
-
     - name: Publish to NuGet.org using Trusted Publishing
       run: dotnet nuget push "*.nupkg" --source nuget.org --skip-duplicate
 
