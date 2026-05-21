@@ -33,8 +33,11 @@ jobs:
     - name: Pack NuGet package
       run: dotnet pack --configuration Release --no-build --output .
 
+    - name: Verify package created
+      run: ls -la *.nupkg
+
     - name: Publish to NuGet.org using Trusted Publishing
-      run: dotnet nuget push "*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      run: dotnet nuget push "*.nupkg" --source nuget.org --skip-duplicate
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
