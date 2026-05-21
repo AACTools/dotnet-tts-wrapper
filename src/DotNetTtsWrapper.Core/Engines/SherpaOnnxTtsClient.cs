@@ -24,7 +24,7 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
 
         Capabilities = new EngineCapabilities
         {
-            SupportsStreaming = false, // SherpaOnnx is batch-oriented
+            SupportsStreaming = true, // SherpaOnnx DOES support streaming via callbacks
             SupportsWordTimings = false, // No word boundary events supported
             SupportsSsml = false, // Plain text only
             SupportsSpeechMarkdown = false,
@@ -296,29 +296,54 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
         options ??= new TtsOptions();
         var preparedText = await PrepareTextAsync(text, options);
 
-        // Configure generation
+        // Collect streaming chunks into complete audio
+        var allAudioData = new List<byte[]>();
+        var progress = 0.0f;
+
+        OfflineTtsCallbackProgressWithArg callback = (IntPtr samples, int n, float currentProgress, IntPtr arg) =>
+        {
+            try
+            {
+                float[] floatData = new float[n];
+                Marshal.Copy(samples, floatData, 0, n);
+                var audioChunk = ConvertFloatToWavChunk(floatData, 24000);
+                lock (allAudioData)
+                {
+                    allAudioData.Add(audioChunk);
+                }
+                progress = currentProgress;
+                return 1;
+            }
+            catch
+            {
+                return 0;
+            }
+        };
+
         var genConfig = new OfflineTtsGenerationConfig
         {
-            Sid = 0, // Default speaker ID
-            Speed = 1.0f, // Normal speed
+            Sid = 0,
+            Speed = 1.0f,
             SilenceScale = 0.2f
         };
 
-        // Generate audio
-        var audio = _tts.GenerateWithConfig(preparedText, genConfig, null);
+        var audio = _tts.GenerateWithConfig(preparedText, genConfig, callback);
 
-        // Save to temp file and read back
-        var tempFile = Path.GetTempFileName();
-        audio.SaveToWaveFile(tempFile);
-        var audioData = await File.ReadAllBytesAsync(tempFile);
-
-        // Clean up temp file
-        if (File.Exists(tempFile))
-            File.Delete(tempFile);
+        // Combine all chunks into complete audio
+        var completeAudio = new byte[allAudioData.Sum(chunk => chunk.Length)];
+        var position = 0;
+        lock (allAudioData)
+        {
+            foreach (var chunk in allAudioData)
+            {
+                Array.Copy(chunk, 0, completeAudio, position, chunk.Length);
+                position += chunk.Length;
+            }
+        }
 
         return new TtsSynthesisResult
         {
-            AudioData = audioData,
+            AudioData = completeAudio,
             WordTimings = new List<WordTimingEventArgs>(), // No word boundaries
             Format = AudioFormat.Wav,
             SampleRate = 24000,
@@ -328,21 +353,103 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
 
     public override async Task<StreamingTtsResult> SynthToStreamAsync(string text, TtsOptions? options = null)
     {
-        // SherpaOnnx doesn't support true streaming, so we'll batch the entire synthesis
-        var synthesisResult = await SynthToBytesAsync(text, options);
+        await InitializeAsync();
+
+        if (_tts == null)
+            throw new InvalidOperationException("SherpaOnnx TTS not initialized");
+
+        options ??= new TtsOptions();
+        var preparedText = await PrepareTextAsync(text, options);
 
         var streamingResult = new StreamingTtsResult
         {
-            Format = synthesisResult.Format,
-            SampleRate = synthesisResult.SampleRate,
-            Channels = synthesisResult.Channels,
-            WordTimings = synthesisResult.WordTimings,
-            FinalAudioData = synthesisResult.AudioData
+            Format = AudioFormat.Wav,
+            SampleRate = 24000,
+            Channels = 1
         };
 
-        // Create pseudo-stream from complete audio
-        streamingResult.AudioStream = CreateAudioChunkStream(synthesisResult.AudioData, synthesisResult.Format);
+        // Create a channel for streaming audio chunks
+        var audioChannel = System.Threading.Channels.Channel.CreateUnbounded<AudioChunkEventArgs>();
+        var allChunks = new List<byte[]>();
+        float progress = 0.0f;
 
+        // Create the callback for real-time streaming
+        OfflineTtsCallbackProgressWithArg callback = (IntPtr samples, int n, float currentProgress, IntPtr arg) =>
+        {
+            try
+            {
+                // Copy audio samples
+                float[] floatData = new float[n];
+                Marshal.Copy(samples, floatData, 0, n);
+
+                // Convert float samples to WAV format (16-bit PCM)
+                var audioChunk = ConvertFloatToWavChunk(floatData, 24000);
+
+                // Create chunk event
+                var chunk = new AudioChunkEventArgs
+                {
+                    AudioData = audioChunk,
+                    Format = AudioFormat.Wav,
+                    IsFinal = currentProgress >= 1.0f,
+                    Position = allChunks.Count * audioChunk.Length
+                };
+
+                // Write to channel for real-time streaming
+                audioChannel.Writer.TryWrite(chunk);
+
+                // Store for later reference
+                lock (allChunks)
+                {
+                    allChunks.Add(audioChunk);
+                }
+
+                progress = currentProgress;
+
+                // Return 1 to continue generation, 0 to stop
+                return 1;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in streaming callback: {ex.Message}");
+                return 0; // Stop generation on error
+            }
+        };
+
+        // Start synthesis in background task
+        var synthesisTask = Task.Run(() =>
+        {
+            try
+            {
+                var genConfig = new OfflineTtsGenerationConfig
+                {
+                    Sid = 0, // Default speaker ID
+                    Speed = 1.0f,
+                    SilenceScale = 0.2f
+                };
+
+                // Generate with streaming callback
+                var audio = _tts.GenerateWithConfig(preparedText, genConfig, callback);
+
+                // Mark stream as complete
+                audioChannel.Writer.TryComplete();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in streaming synthesis: {ex.Message}");
+                audioChannel.Writer.TryComplete();
+            }
+        });
+
+        // Create async enumerable from the channel
+        async IAsyncEnumerable<AudioChunkEventArgs> AudioStream()
+        {
+            await foreach (var chunk in audioChannel.Reader.ReadAllAsync())
+            {
+                yield return chunk;
+            }
+        }
+
+        streamingResult.AudioStream = AudioStream();
         return streamingResult;
     }
 
@@ -453,30 +560,73 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
         }
     }
 
-    private async IAsyncEnumerable<AudioChunkEventArgs> CreateAudioChunkStream(byte[] audioData, AudioFormat format)
+    /// <summary>
+    /// Convert float samples to WAV chunk format
+    /// </summary>
+    private byte[] ConvertFloatToWavChunk(float[] samples, int sampleRate)
     {
-        const int chunkSize = 4096; // 4KB chunks
+        const int bitsPerSample = 16;
+        const int numChannels = 1;
+
+        // Convert Float32Array to Int16Array (16-bit PCM)
+        var int16Samples = new short[samples.Length];
+        for (int i = 0; i < samples.Length; i++)
+        {
+            var sample = Math.Max(-1, Math.Min(1, samples[i]));
+            int16Samples[i] = sample < 0 ? (short)(sample * 0x8000) : (short)(sample * 0x7FFF);
+        }
+
+        // Create minimal WAV header for this chunk
+        var headerSize = 44; // Standard WAV header size
+        var dataSize = int16Samples.Length * 2;
+        var totalSize = headerSize + dataSize;
+
+        var wavBytes = new byte[totalSize];
         var position = 0;
 
-        while (position < audioData.Length)
-        {
-            var remainingBytes = audioData.Length - position;
-            var chunkSizeToUse = Math.Min(chunkSize, remainingBytes);
+        // RIFF header
+        var riffHeader = new byte[] { 0x52, 0x49, 0x46, 0x46 };
+        Buffer.BlockCopy(riffHeader, 0, wavBytes, position, 4);
+        position += 4;
 
-            var chunk = new byte[chunkSizeToUse];
-            Array.Copy(audioData, position, chunk, 0, chunkSizeToUse);
+        var fileSize = BitConverter.GetBytes(totalSize - 8);
+        Buffer.BlockCopy(fileSize, 0, wavBytes, position, 4);
+        position += 4;
 
-            yield return new AudioChunkEventArgs
-            {
-                AudioData = chunk,
-                Format = format,
-                IsFinal = (position + chunkSizeToUse) >= audioData.Length,
-                Position = position
-            };
+        // WAVE format
+        var waveHeader = new byte[] { 0x57, 0x41, 0x56, 0x45 };
+        Buffer.BlockCopy(waveHeader, 0, wavBytes, position, 4);
+        position += 4;
 
-            position += chunkSizeToUse;
-            await Task.Delay(50); // Small delay to simulate streaming
-        }
+        // fmt chunk
+        var fmtChunk = new byte[] { 0x66, 0x6D, 0x74, 0x20 };
+        Buffer.BlockCopy(fmtChunk, 0, wavBytes, position, 4);
+        position += 4;
+
+        var subChunkSize = BitConverter.GetBytes(16);
+        Buffer.BlockCopy(subChunkSize, 0, wavBytes, position, 4);
+        position += 4;
+
+        WriteUShort(1, wavBytes, ref position); // Audio format (PCM)
+        WriteUShort((ushort)numChannels, wavBytes, ref position);
+        WriteUInt((uint)sampleRate, wavBytes, ref position);
+        WriteUInt((uint)(sampleRate * numChannels * (bitsPerSample / 8)), wavBytes, ref position);
+        WriteUShort((ushort)(numChannels * (bitsPerSample / 8)), wavBytes, ref position);
+        WriteUShort((ushort)bitsPerSample, wavBytes, ref position);
+
+        // data chunk
+        var dataChunk = new byte[] { 0x64, 0x61, 0x74, 0x61 };
+        Buffer.BlockCopy(dataChunk, 0, wavBytes, position, 4);
+        position += 4;
+
+        var dataLength = BitConverter.GetBytes(dataSize);
+        Buffer.BlockCopy(dataLength, 0, wavBytes, position, 4);
+        position += 4;
+
+        // Copy audio data
+        Buffer.BlockCopy(int16Samples, 0, wavBytes, position, dataSize);
+
+        return wavBytes;
     }
 
     protected override void Dispose(bool disposing)
@@ -488,6 +638,26 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
             _isInitialized = false;
         }
         base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// Write a ushort to byte array in little-endian format
+    /// </summary>
+    private void WriteUShort(ushort value, byte[] buffer, ref int position)
+    {
+        buffer[position++] = (byte)(value & 0xFF);
+        buffer[position++] = (byte)((value >> 8) & 0xFF);
+    }
+
+    /// <summary>
+    /// Write a uint to byte array in little-endian format
+    /// </summary>
+    private void WriteUInt(uint value, byte[] buffer, ref int position)
+    {
+        buffer[position++] = (byte)(value & 0xFF);
+        buffer[position++] = (byte)((value >> 8) & 0xFF);
+        buffer[position++] = (byte)((value >> 16) & 0xFF);
+        buffer[position++] = (byte)((value >> 24) & 0xFF);
     }
 
     private class ModelConfiguration

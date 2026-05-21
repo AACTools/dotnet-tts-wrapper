@@ -41,7 +41,7 @@ public class SherpaOnnxTtsClientTests : IDisposable
         }
 
         Assert.NotNull(_client);
-        Assert.True(_client.Capabilities.SupportsStreaming == false, "SherpaOnnx does not support streaming");
+        Assert.True(_client.Capabilities.SupportsStreaming, "SherpaOnnx DOES support streaming via callbacks");
         Assert.True(_client.Capabilities.SupportsWordTimings == false, "SherpaOnnx does not support word timings");
         Assert.True(_client.Capabilities.RequiresInternet == false, "SherpaOnnx is fully offline");
     }
@@ -165,7 +165,7 @@ public class SherpaOnnxTtsClientTests : IDisposable
     }
 
     [Fact]
-    public async Task SynthToStreamAsync_ShouldReturnPseudoStream()
+    public async Task SynthToStreamAsync_ShouldReturnRealStream()
     {
         if (_client == null)
         {

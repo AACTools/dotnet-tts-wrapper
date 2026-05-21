@@ -27,7 +27,7 @@ A .NET NuGet package that provides a unified API for working with multiple cloud
 | **Resemble** | ❌ No | ✅ Yes | Resemble AI API |
 | **UpliftAI** | ❌ No | ✅ Yes | Uplift AI API |
 | **ModelsLab** | ❌ No | ✅ Yes | Models Lab API |
-| **SherpaOnnx** | ❌ No | ❌ No | Local offline TTS (Kokoro/Matcha/VITS models) |
+| **SherpaOnnx** | ❌ No | ✅ Yes | Local offline TTS with real streaming (Kokoro/Matcha/VITS models) |
 | **eSpeak** | ❌ No | ❌ No | Coming soon (local offline TTS) |
 | **CereVoice** | ❌ No | ❌ No | Coming soon (CereProc TTS) |
 
