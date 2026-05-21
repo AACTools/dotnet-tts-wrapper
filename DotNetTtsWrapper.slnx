@@ -2,4 +2,5 @@
   <Folder Name="/src/">
     <Project Path="src/DotNetTtsWrapper.Core/DotNetTtsWrapper.Core.csproj" />
   </Folder>
+  <Project Path="DotNetTtsWrapper.Tests/DotNetTtsWrapper.Tests.csproj" />
 </Solution>
