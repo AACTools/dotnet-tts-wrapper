@@ -13,7 +13,8 @@ A .NET NuGet package that provides a unified API for working with multiple cloud
 | **Google** | ❌ No | ✅ Yes | Requires Google Cloud credentials |
 | **Polly** | ❌ No | ✅ Yes | AWS Polly (requires AWS credentials) |
 | **OpenAI** | ❌ No | ✅ Yes | OpenAI TTS API |
-| **ElevenLabs** | ❌ No | ✅ Yes | ElevenLabs API |
+| **Google** | ✅ Word | ✅ Yes | Google Cloud TTS (word timepoints) |
+| **ElevenLabs** | ✅ Character | ✅ Yes | ElevenLabs API (character + word events) |
 | **Watson** | ❌ No | ✅ Yes | IBM Watson TTS |
 | **PlayHT** | ❌ No | ✅ Yes | Play.ht API |
 | **WitAI** | ❌ No | ✅ Yes | Wit.ai API |

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using DotNetTtsWrapper.Events;
 using DotNetTtsWrapper.Models;
 
 namespace DotNetTtsWrapper.Engines;
@@ -42,37 +43,163 @@ public class GoogleTtsClient : HttpTtsClientBase
 
     protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)
     {
+        // Build the base payload
+        var inputObj = new Dictionary<string, object>();
+        if (options?.RawSsml == true || text.TrimStart().StartsWith("<speak"))
+        {
+            inputObj["ssml"] = text;
+        }
+        else
+        {
+            inputObj["text"] = text;
+        }
+
+        var voiceObj = new Dictionary<string, object>
+        {
+            ["languageCode"] = "en-US",
+            ["name"] = options?.VoiceId ?? VoiceId ?? "en-US-Wavenet-D"
+        };
+
+        var audioConfigObj = new Dictionary<string, object>
+        {
+            ["audioEncoding"] = options?.Format switch
+            {
+                AudioFormat.Mp3 => "MP3",
+                AudioFormat.Wav => "LINEAR16",
+                AudioFormat.Ogg => "OGG_OPUS",
+                _ => "MP3"
+            },
+            ["speakingRate"] = GetSpeakingRate(options),
+            ["pitch"] = GetPitch(options),
+            ["sampleRateHertz"] = 24000
+        };
+
+        // Enable timepoints for word boundary events
+        if (options?.EnableWordTimings == true)
+        {
+            audioConfigObj["enableTimepointing"] = true;
+        }
+
         return new
         {
-            input = new
-            {
-                text = text,
-                ssml = options?.RawSsml == true || text.TrimStart().StartsWith("<speak") ? text : null
-            },
-            voice = new
-            {
-                languageCode = "en-US",
-                name = options?.VoiceId ?? VoiceId ?? "en-US-Wavenet-D"
-            },
-            audioConfig = new
-            {
-                audioEncoding = options?.Format switch
-                {
-                    AudioFormat.Mp3 => "MP3",
-                    AudioFormat.Wav => "LINEAR16",
-                    AudioFormat.Ogg => "OGG_OPUS",
-                    _ => "MP3"
-                },
-                speakingRate = GetSpeakingRate(options),
-                pitch = GetPitch(options),
-                sampleRateHertz = 24000
-            }
+            input = inputObj,
+            voice = voiceObj,
+            audioConfig = audioConfigObj
         };
     }
 
     protected override string GetSynthesisEndpoint(TtsOptions options)
     {
         return "text:synthesize";
+    }
+
+    /// <summary>
+    /// Process Google TTS timepoints into word timings
+    /// </summary>
+    private List<WordTimingEventArgs> ProcessTimepoints(JsonElement timepoints)
+    {
+        var wordTimings = new List<WordTimingEventArgs>();
+
+        try
+        {
+            if (timepoints.ValueKind != JsonValueKind.Array)
+                return wordTimings;
+
+            var timepointArray = timepoints.EnumerateArray().ToList();
+
+            for (int i = 0; i < timepointArray.Count; i++)
+            {
+                var timepoint = timepointArray[i];
+
+                if (!timepoint.TryGetProperty("markName", out var markName) ||
+                    !timepoint.TryGetProperty("timeSeconds", out var timeSeconds))
+                    continue;
+
+                var wordText = markName.GetString();
+                var startTime = timeSeconds.GetDouble();
+
+                // Calculate end time (next timepoint's start time)
+                double endTime = startTime;
+                if (i < timepointArray.Count - 1)
+                {
+                    var nextTimepoint = timepointArray[i + 1];
+                    if (nextTimepoint.TryGetProperty("timeSeconds", out var nextTimeSeconds))
+                    {
+                        endTime = nextTimeSeconds.GetDouble();
+                    }
+                }
+
+                var timing = new WordTimingEventArgs(wordText ?? "", startTime, endTime);
+                wordTimings.Add(timing);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing Google timepoints: {ex.Message}");
+        }
+
+        return wordTimings;
+    }
+
+    /// <summary>
+    /// Override synthesis to process timepoints when word timings are enabled
+    /// </summary>
+    public override async Task<TtsSynthesisResult> SynthToBytesAsync(string text, TtsOptions? options = null)
+    {
+        if (options?.EnableWordTimings == true)
+        {
+            var payload = await BuildSynthesisPayload(text, options);
+            var content = JsonContent.Create(payload);
+            var response = await _httpClient.PostAsync($"{BaseEndpoint}/{GetSynthesisEndpoint(options)}", content);
+            response.EnsureSuccessStatusCode();
+
+            var jsonString = await response.Content.ReadAsStringAsync();
+            var jsonDoc = JsonDocument.Parse(jsonString);
+
+            var audioBase64 = jsonDoc.RootElement.GetProperty("audioContent").GetString();
+            var audioBytes = Convert.FromBase64String(audioBase64 ?? "");
+
+            // Process timepoints into word timings
+            var wordTimings = new List<WordTimingEventArgs>();
+            if (jsonDoc.RootElement.TryGetProperty("timepoints", out var timepoints))
+            {
+                wordTimings = ProcessTimepoints(timepoints);
+            }
+
+            return new TtsSynthesisResult
+            {
+                AudioData = audioBytes,
+                WordTimings = wordTimings,
+                Format = options?.Format ?? AudioFormat.Mp3,
+                SampleRate = 24000,
+                Channels = 1
+            };
+        }
+
+        return await base.SynthToBytesAsync(text, options);
+    }
+
+    /// <summary>
+    /// Override streaming synthesis to process timepoints when word timings are enabled
+    /// </summary>
+    public override async Task<StreamingTtsResult> SynthToStreamAsync(string text, TtsOptions? options = null)
+    {
+        if (options?.EnableWordTimings == true)
+        {
+            var bytesResult = await SynthToBytesAsync(text, options);
+
+            return new StreamingTtsResult
+            {
+                AudioStream = CreateAsyncEnumerableFromBytes(bytesResult.AudioData, bytesResult.Format),
+                WordTimings = bytesResult.WordTimings,
+                Format = bytesResult.Format,
+                SampleRate = bytesResult.SampleRate,
+                Channels = bytesResult.Channels,
+                FinalAudioData = bytesResult.AudioData
+            };
+        }
+
+        return await base.SynthToStreamAsync(text, options);
     }
 
     protected override string GetStreamingEndpoint(TtsOptions options)
