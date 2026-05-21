@@ -69,7 +69,8 @@ public static class TtsFactory
         return new[]
         {
             // Windows engines
-            "sapi", "azure",
+            "sapi",
+            "azure",
 
             // Local engines
             "sherpaonnx",

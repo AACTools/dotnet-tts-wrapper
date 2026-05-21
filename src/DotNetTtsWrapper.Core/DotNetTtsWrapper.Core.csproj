@@ -14,8 +14,8 @@
     <Product>DotNet TTS Wrapper</Product>
     <Description>A .NET NuGet package that provides a unified API for working with multiple cloud-based and local Text-to-Speech (TTS) services. Supports 20+ TTS engines including Azure, Google, AWS Polly, OpenAI, ElevenLabs, and SherpaOnnx for offline TTS.</Description>
     <PackageTags>tts;text-to-speech;speech;azure;google;aws;polly;openai;elevenlabs;sherpa-onnx;voice;audio;synthesis</PackageTags>
-    <PackageProjectUrl>https://github.com/WillWade/dotnet-tts-wrapper</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/WillWade/dotnet-tts-wrapper</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/AACTools/dotnet-tts-wrapper</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/AACTools/dotnet-tts-wrapper</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -32,6 +32,10 @@
 
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="System.Speech" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <Compile Remove="Engines\SapiTtsClient.cs" />
   </ItemGroup>
 
   <ItemGroup>

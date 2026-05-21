@@ -2,6 +2,8 @@
 
 A .NET NuGet package that provides a unified API for working with multiple cloud-based and local Text-to-Speech (TTS) services. Ported from js-tts-wrapper.
 
+**Repository**: https://github.com/AACTools/dotnet-tts-wrapper
+
 ## Supported Engines
 
 | Engine | Word Events | Streaming | Notes |
