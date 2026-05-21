@@ -27,7 +27,7 @@ A .NET NuGet package that provides a unified API for working with multiple cloud
 | **Resemble** | ❌ No | ✅ Yes | Resemble AI API |
 | **UpliftAI** | ❌ No | ✅ Yes | Uplift AI API |
 | **ModelsLab** | ❌ No | ✅ Yes | Models Lab API |
-| **SherpaOnnx** | ❌ No | ❌ No | Coming soon (local offline TTS) |
+| **SherpaOnnx** | ❌ No | ❌ No | Local offline TTS (Kokoro/Matcha/VITS models) |
 | **eSpeak** | ❌ No | ❌ No | Coming soon (local offline TTS) |
 | **CereVoice** | ❌ No | ❌ No | Coming soon (CereProc TTS) |
 
@@ -145,7 +145,7 @@ Ported from js-tts-wrapper with .NET-specific enhancements.
 
 ## Roadmap
 
-- [ ] SherpaOnnx integration (local offline TTS with Kokoro/Matcha/VITS models)
 - [ ] eSpeak integration (local offline TTS)
 - [ ] Speech Markdown support
+- [ ] Advanced model management for SherpaOnnx
 - [ ] Additional cloud engine integrations

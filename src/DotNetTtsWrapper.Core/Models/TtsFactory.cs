@@ -22,6 +22,7 @@ public static class TtsFactory
             // Windows engines
             "sapi" => new SapiTtsClient(),
             "azure" => new AzureSdkTtsClient(credentials as AzureCredentials),
+            "sherpaonnx" => new SherpaOnnxTtsClient(credentials as SherpaOnnxCredentials),
 
             // Cloud engines
             "google" => new GoogleTtsClient(credentials as GoogleCredentials),
@@ -46,7 +47,6 @@ public static class TtsFactory
 
             // Local engines (will be implemented later)
             "espeak" => throw new NotImplementedException("eSpeak support coming soon"),
-            "sherpaonnx" => throw new NotImplementedException("SherpaOnnx support coming soon"),
             "cerevoice" => throw new NotImplementedException("CereVoice support coming soon"),
 
             _ => throw new NotSupportedException($"Engine '{engine}' is not supported")
@@ -70,6 +70,9 @@ public static class TtsFactory
         {
             // Windows engines
             "sapi", "azure",
+
+            // Local engines
+            "sherpaonnx",
 
             // Cloud engines
             "google", "polly", "openai", "elevenlabs", "watson", "playht", "witai",
