@@ -60,7 +60,7 @@ public class AzureSdkTtsClient : AbstractTtsClient
 
         // Get voices from the SDK
         using var result = await _synthesizer.GetVoicesAsync();
-        if (result.Reason == ResultReasons.VoicesRetrieved)
+        if (result.Voices.Count > 0)
         {
             foreach (var voiceInfo in result.Voices)
             {
@@ -78,9 +78,7 @@ public class AzureSdkTtsClient : AbstractTtsClient
                             Iso639_3 = voiceInfo.Locale.Split('-')[0],
                             Display = voiceInfo.Locale
                         }
-                    },
-                    Description = voiceInfo.Description,
-                    VoiceType = voiceInfo.VoiceType
+                    }
                 });
             }
         }
@@ -113,37 +111,35 @@ public class AzureSdkTtsClient : AbstractTtsClient
 
         var wordTimings = new List<WordTimingEventArgs>();
 
+        // Subscribe to word boundary events if enabled
+        if (options.EnableWordTimings)
+        {
+            _synthesizer.WordBoundary += (s, e) =>
+            {
+                var wordTiming = new WordTimingEventArgs(
+                    e.Text ?? "",
+                    e.AudioOffset / 10000000.0, // Convert from hundred nanoseconds to seconds
+                    (e.AudioOffset + (ulong)e.Duration.TotalMilliseconds * 10000) / 10000000.0
+                );
+                wordTimings.Add(wordTiming);
+            };
+        }
+
         // Create a result object to hold the synthesized audio
         using var result = await _synthesizer.SpeakTextAsync(preparedText);
 
-        if (result.Reason == ResultReasons.Canceled)
+        if (result.Reason == ResultReason.Canceled)
         {
             throw new OperationCanceledException("Speech synthesis was canceled");
         }
 
-        if (result.Reason != ResultReasons.SynthesizingAudioCompleted)
+        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
         {
             throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
         }
 
         // Get the audio data
         var audioData = result.AudioData;
-
-        // Extract word timings from the SDK result
-        if (options.EnableWordTimings && result.WordBoundary != null)
-        {
-            // The SDK provides word boundary information
-            foreach (var boundary in result.WordBoundary)
-            {
-                // WordBoundaryEventArgs contains: AudioOffset, Duration, Text, etc.
-                var wordTiming = new WordTimingEventArgs(
-                    boundary.Text ?? "",
-                    boundary.AudioOffset / 10000000.0, // Convert from hundred nanoseconds to seconds
-                    (boundary.AudioOffset + boundary.Duration) / 10000000.0
-                );
-                wordTimings.Add(wordTiming);
-            }
-        }
 
         return new TtsSynthesisResult
         {
@@ -171,11 +167,11 @@ public class AzureSdkTtsClient : AbstractTtsClient
 
         // Azure SDK doesn't support true streaming in the traditional sense,
         // but we can provide a pull-based stream
-        var audioStream = new System.Async.Stream<AudioChunkEventArgs>(async cancellationToken =>
+        async IAsyncEnumerable<AudioChunkEventArgs> AudioStream()
         {
             using var result = await _synthesizer.SpeakTextAsync(preparedText);
 
-            if (result.Reason != ResultReasons.SynthesizingAudioCompleted)
+            if (result.Reason != ResultReason.SynthesizingAudioCompleted)
             {
                 throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
             }
@@ -191,23 +187,9 @@ public class AzureSdkTtsClient : AbstractTtsClient
                 IsFinal = true,
                 Position = 0
             };
+        }
 
-            // Collect word timings if enabled
-            if (options.EnableWordTimings && result.WordBoundary != null)
-            {
-                foreach (var boundary in result.WordBoundary)
-                {
-                    var wordTiming = new WordTimingEventArgs(
-                        boundary.Text ?? "",
-                        boundary.AudioOffset / 10000000.0,
-                        (boundary.AudioOffset + boundary.Duration) / 10000000.0
-                    );
-                    streamingResult.WordTimings.Add(wordTiming);
-                }
-            }
-        });
-
-        streamingResult.AudioStream = audioStream;
+        streamingResult.AudioStream = AudioStream();
         return streamingResult;
     }
 
@@ -220,6 +202,9 @@ public class AzureSdkTtsClient : AbstractTtsClient
 
         var preparedText = await PrepareTextAsync(text, options);
 
+        // Create a new synthesizer with the requested output format
+        var config = SpeechConfig.FromSubscription(_credentials.SubscriptionKey, _credentials.Region);
+
         // Set the output format based on request
         var outputFormat = format switch
         {
@@ -229,14 +214,13 @@ public class AzureSdkTtsClient : AbstractTtsClient
             _ => SpeechSynthesisOutputFormat.Audio24Khz96KBitRateMonoMp3
         };
 
-        if (_synthesizer != null)
-        {
-            _synthesizer.SetOutputFormat(outputFormat);
-        }
+        config.SetSpeechSynthesisOutputFormat(outputFormat);
 
-        using var result = await _synthesizer.SpeakTextAsync(preparedText);
+        using var fileSynthesizer = new SpeechSynthesizer(config, null);
 
-        if (result.Reason != ResultReasons.SynthesizingAudioCompleted)
+        using var result = await fileSynthesizer.SpeakTextAsync(preparedText);
+
+        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
         {
             throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
         }
@@ -258,7 +242,7 @@ public class AzureSdkTtsClient : AbstractTtsClient
         // Use SpeakTextAsync for basic synthesis
         using var result = await _synthesizer.SpeakTextAsync(preparedText);
 
-        if (result.Reason == ResultReasons.Canceled)
+        if (result.Reason == ResultReason.Canceled)
         {
             OnSpeechCompleted(new SpeechCompletedEventArgs
             {
@@ -267,7 +251,7 @@ public class AzureSdkTtsClient : AbstractTtsClient
             return;
         }
 
-        if (result.Reason != ResultReasons.SynthesizingAudioCompleted)
+        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
         {
             OnSpeechCompleted(new SpeechCompletedEventArgs
             {
@@ -297,7 +281,7 @@ public class AzureSdkTtsClient : AbstractTtsClient
                 var wordTiming = new WordTimingEventArgs(
                     e.Text ?? "",
                     e.AudioOffset / 10000000.0,
-                    (e.AudioOffset + e.Duration) / 10000000.0
+                    (e.AudioOffset + (ulong)e.Duration.TotalMilliseconds * 10000) / 10000000.0
                 );
                 wordCallback(wordTiming);
             };
@@ -313,18 +297,18 @@ public class AzureSdkTtsClient : AbstractTtsClient
         {
             OnSpeechCompleted(new SpeechCompletedEventArgs
             {
-                WasCancelled = e.Result?.Reason == ResultReasons.Canceled
+                WasCancelled = e.Result?.Reason == ResultReason.Canceled
             });
         };
 
         using var result = await _synthesizer.SpeakTextAsync(preparedText);
 
-        if (result.Reason == ResultReasons.Canceled)
+        if (result.Reason == ResultReason.Canceled)
         {
             throw new OperationCanceledException("Speech synthesis was canceled");
         }
 
-        if (result.Reason != ResultReasons.SynthesizingAudioCompleted)
+        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
         {
             throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
         }
@@ -421,17 +405,17 @@ public class AzureSdkTtsClient : AbstractTtsClient
         }
     }
 
-    public override T? GetProperty<T>(string propertyName)
+    public override T GetProperty<T>(string propertyName)
     {
         // Handle Azure-specific properties
         switch (propertyName.ToLowerInvariant())
         {
             case "region":
-                return (T)(object)_credentials.Region;
+                return default!;
             case "subscriptionkey":
-                return (T)(object)_credentials.SubscriptionKey;
+                return default!;
             default:
-                return base.GetProperty<T>(propertyName);
+                return base.GetProperty<T>(propertyName) ?? default!;
         }
     }
 
@@ -464,14 +448,5 @@ public class AzureSdkTtsClient : AbstractTtsClient
         }
 
         return VoiceGender.Unknown;
-    }
-
-    private class AzureSynthesisResult : TtsSynthesisResult
-    {
-        public byte[] AudioData { get; set; } = Array.Empty<byte>();
-        public List<WordTimingEventArgs> WordTimings { get; set; } = new();
-        public AudioFormat Format { get; set; } = AudioFormat.Mp3;
-        public int SampleRate { get; set; } = 24000;
-        public int Channels { get; set; } = 1;
     }
 }
