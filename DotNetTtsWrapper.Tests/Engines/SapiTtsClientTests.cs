@@ -42,7 +42,7 @@ public class SapiTtsClientTests : IDisposable
         }
     }
 
-    [Fact(Skip = "Requires Windows")]
+    [Fact]
     public async Task GetVoicesAsync_ShouldReturnVoices()
     {
         if (_client == null)
@@ -66,7 +66,7 @@ public class SapiTtsClientTests : IDisposable
         }
     }
 
-    [Fact(Skip = "Requires Windows")]
+    [Fact]
     public async Task SynthToBytesAsync_ShouldGenerateAudio()
     {
         if (_client == null)
@@ -88,7 +88,7 @@ public class SapiTtsClientTests : IDisposable
         _output.WriteLine($"Format: {result.Format}, Sample Rate: {result.SampleRate}, Channels: {result.Channels}");
     }
 
-    [Fact(Skip = "Requires Windows")]
+    [Fact]
     public async Task SynthToFileAsync_ShouldCreateFile()
     {
         if (_client == null)
@@ -118,7 +118,7 @@ public class SapiTtsClientTests : IDisposable
         }
     }
 
-    [Fact(Skip = "Requires Windows")]
+    [Fact]
     public async Task GetVoicesByLanguageAsync_ShouldFilterByLanguage()
     {
         if (_client == null)
@@ -140,7 +140,7 @@ public class SapiTtsClientTests : IDisposable
         }
     }
 
-    [Fact(Skip = "Requires Windows")]
+    [Fact]
     public async Task CheckCredentialsAsync_ShouldValidateSuccessfully()
     {
         if (_client == null)
@@ -158,7 +158,7 @@ public class SapiTtsClientTests : IDisposable
         _output.WriteLine($"Credentials validation: IsValid={result.IsValid}, VoiceCount={result.AvailableVoiceCount}");
     }
 
-    [Fact(Skip = "Requires Windows")]
+    [Fact]
     public async Task SetVoice_ShouldChangeVoice()
     {
         if (_client == null)

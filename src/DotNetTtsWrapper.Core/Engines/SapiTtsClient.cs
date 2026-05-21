@@ -269,7 +269,10 @@ public class SapiTtsClient : AbstractTtsClient
     {
         if (PlaybackState.IsPlaying && !PlaybackState.IsPaused)
         {
-            _synthesizer.Pause();
+            if (_synthesizer != null)
+            {
+                _synthesizer.Pause();
+            }
             PlaybackState.IsPaused = true;
         }
     }
@@ -278,7 +281,10 @@ public class SapiTtsClient : AbstractTtsClient
     {
         if (PlaybackState.IsPaused)
         {
-            _synthesizer.Resume();
+            if (_synthesizer != null)
+            {
+                _synthesizer.Resume();
+            }
             PlaybackState.IsPaused = false;
         }
     }
@@ -286,7 +292,17 @@ public class SapiTtsClient : AbstractTtsClient
     public override void Stop()
     {
         _playbackCts?.Cancel();
-        _synthesizer.SpeakAsyncCancelAll();
+        if (_synthesizer != null)
+        {
+            try
+            {
+                _synthesizer.SpeakAsyncCancelAll();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore if already disposed
+            }
+        }
         PlaybackState.IsPlaying = false;
         PlaybackState.IsPaused = false;
     }
