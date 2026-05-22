@@ -20,7 +20,7 @@ public class XaiTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -77,7 +77,7 @@ public class FishAudioTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -140,7 +140,7 @@ public class MistralTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -198,7 +198,7 @@ public class MurfTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -261,7 +261,7 @@ public class UnrealSpeechTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -323,7 +323,7 @@ public class ResembleTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -386,7 +386,7 @@ public class UpliftAiTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -443,7 +443,7 @@ public class ModelsLabTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 

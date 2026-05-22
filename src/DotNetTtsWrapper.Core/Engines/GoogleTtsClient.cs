@@ -31,7 +31,7 @@ public class GoogleTtsClient : HttpTtsClientBase
             SupportsStreaming = false,
             SupportsWordTimings = true,
             SupportsSsml = true,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,
@@ -39,6 +39,11 @@ public class GoogleTtsClient : HttpTtsClientBase
         };
 
         VoiceId = "en-US-Wavenet-D";
+    }
+
+    protected override string GetSpeechMarkdownPlatform()
+    {
+        return global::SpeechMarkdown.Platform.GoogleAssistant;
     }
 
     protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)

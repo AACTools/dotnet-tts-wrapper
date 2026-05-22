@@ -28,7 +28,7 @@ public class PollyTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = true,
             SupportsSsml = true,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,
@@ -36,6 +36,11 @@ public class PollyTtsClient : HttpTtsClientBase
         };
 
         VoiceId = "Joanna";
+    }
+
+    protected override string GetSpeechMarkdownPlatform()
+    {
+        return global::SpeechMarkdown.Platform.AmazonAlexa;
     }
 
     protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)

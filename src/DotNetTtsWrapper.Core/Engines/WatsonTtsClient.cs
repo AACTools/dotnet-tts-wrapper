@@ -25,7 +25,7 @@ public class WatsonTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = true,
             SupportsSsml = true,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,
@@ -33,6 +33,11 @@ public class WatsonTtsClient : HttpTtsClientBase
         };
 
         VoiceId = "en-US_MichaelV3Voice";
+    }
+
+    protected override string GetSpeechMarkdownPlatform()
+    {
+        return global::SpeechMarkdown.Platform.IbmWatson;
     }
 
     protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)

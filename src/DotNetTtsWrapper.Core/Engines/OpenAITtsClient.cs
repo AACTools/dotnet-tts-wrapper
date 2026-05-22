@@ -23,9 +23,9 @@ public class OpenAITtsClient : HttpTtsClientBase
         Capabilities = new EngineCapabilities
         {
             SupportsStreaming = true,
-            SupportsWordTimings = false, // OpenAI doesn't provide word timings
-            SupportsSsml = false, // OpenAI doesn't support SSML
-            SupportsSpeechMarkdown = false,
+            SupportsWordTimings = false,
+            SupportsSsml = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,

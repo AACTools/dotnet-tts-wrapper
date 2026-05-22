@@ -26,7 +26,7 @@ public class PlayHtTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,

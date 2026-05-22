@@ -40,6 +40,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CognitiveServices.Speech" Version="1.47.0" />
+    <PackageReference Include="SpeechMarkdown" Version="0.1.13" />
     <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.13.2" />
   </ItemGroup>
 

@@ -1,126 +1,109 @@
 using System.Text;
+using DotNetTtsWrapper.Models;
 
 namespace DotNetTtsWrapper.Utils;
 
-/// <summary>
-/// Fluent SSML builder for creating speech synthesis markup
-/// </summary>
 public class SsmlBuilder
 {
     private readonly StringBuilder _sb = new();
-    private bool _isSpeakClosed = false;
+    private bool _speakClosed;
+    private bool _voiceOpen;
+    private bool _prosodyOpen;
 
-    /// <summary>
-    /// Start a new SSML document
-    /// </summary>
-    public static SsmlBuilder Speak()
+    public static SsmlBuilder Create()
     {
         var builder = new SsmlBuilder();
-        builder._sb.AppendLine("<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\">");
+        builder._sb.Append("<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\">");
         return builder;
     }
 
-    /// <summary>
-    /// Set the voice for synthesis
-    /// </summary>
+    [Obsolete("Use Create() instead")]
+    public static SsmlBuilder Speak() => Create();
+
     public SsmlBuilder Voice(string voiceId)
     {
-        _sb.AppendLine($"<voice name=\"{voiceId}\">");
+        _sb.Append($"<voice name=\"{System.Security.SecurityElement.Escape(voiceId)}\">");
+        _voiceOpen = true;
         return this;
     }
 
-    /// <summary>
-    /// Add prosody (rate, pitch, volume)
-    /// </summary>
-    public SsmlBuilder WithRate(string rate)
+    public SsmlBuilder BeginProsody(SpeechRate? rate, SpeechPitch? pitch, int? volume)
     {
-        _sb.AppendLine($"<prosody rate=\"{rate}\">");
+        var parts = new List<string>();
+        if (rate.HasValue)
+            parts.Add($"rate=\"{rate.Value.ToString().ToLowerInvariant()}\"");
+        if (pitch.HasValue)
+            parts.Add($"pitch=\"{pitch.Value.ToString().ToLowerInvariant()}\"");
+        if (volume.HasValue)
+            parts.Add($"volume=\"{volume.Value}\"");
+
+        if (parts.Count > 0)
+        {
+            _sb.Append($"<prosody {string.Join(" ", parts)}>");
+            _prosodyOpen = true;
+        }
         return this;
     }
 
-    /// <summary>
-    /// Add prosody (rate, pitch, volume)
-    /// </summary>
-    public SsmlBuilder WithPitch(string pitch)
+    public SsmlBuilder EndProsody()
     {
-        _sb.AppendLine($"<prosody pitch=\"{pitch}\">");
+        if (_prosodyOpen)
+        {
+            _sb.Append("</prosody>");
+            _prosodyOpen = false;
+        }
         return this;
     }
 
-    /// <summary>
-    /// Add prosody (rate, pitch, volume)
-    /// </summary>
-    public SsmlBuilder WithVolume(int volume)
+    public SsmlBuilder EndVoice()
     {
-        _sb.AppendLine($"<prosody volume=\"{volume}\">");
+        if (_voiceOpen)
+        {
+            EndProsody();
+            _sb.Append("</voice>");
+            _voiceOpen = false;
+        }
         return this;
     }
 
-    /// <summary>
-    /// Add a break/pause
-    /// </summary>
     public SsmlBuilder Break(string time)
     {
-        _sb.AppendLine($"<break time=\"{time}\"/>");
+        _sb.Append($"<break time=\"{System.Security.SecurityElement.Escape(time)}\"/>");
         return this;
     }
 
-    /// <summary>
-    /// Add emphasis
-    /// </summary>
     public SsmlBuilder Emphasis(string level, string text)
     {
-        _sb.AppendLine($"<emphasis level=\"{level}\">{text}</emphasis>");
+        _sb.Append($"<emphasis level=\"{System.Security.SecurityElement.Escape(level)}\">{System.Security.SecurityElement.Escape(text)}</emphasis>");
         return this;
     }
 
-    /// <summary>
-    /// Add plain text
-    /// </summary>
     public SsmlBuilder AddText(string text)
     {
-        // Escape XML special characters
-        var escaped = System.Security.SecurityElement.Escape(text);
-        _sb.AppendLine(escaped);
+        _sb.Append(System.Security.SecurityElement.Escape(text));
         return this;
     }
 
-    /// <summary>
-    /// Say-as element for specifying how text should be interpreted
-    /// </summary>
     public SsmlBuilder SayAs(string interpretAs, string text)
     {
-        _sb.AppendLine($"<say-as interpret-as=\"{interpretAs}\">{text}</say-as>");
+        _sb.Append($"<say-as interpret-as=\"{System.Security.SecurityElement.Escape(interpretAs)}\">{System.Security.SecurityElement.Escape(text)}</say-as>");
         return this;
     }
 
-    /// <summary>
-    /// Phoneme element for pronunciation
-    /// </summary>
     public SsmlBuilder Phoneme(string alphabet, string ph, string text)
     {
-        _sb.AppendLine($"<phoneme alphabet=\"{alphabet}\" ph=\"{ph}\">{text}</phoneme>");
+        _sb.Append($"<phoneme alphabet=\"{System.Security.SecurityElement.Escape(alphabet)}\" ph=\"{System.Security.SecurityElement.Escape(ph)}\">{System.Security.SecurityElement.Escape(text)}</phoneme>");
         return this;
     }
 
-    /// <summary>
-    /// Close the current element
-    /// </summary>
-    public SsmlBuilder Close()
-    {
-        _sb.AppendLine("</prosody>");
-        return this;
-    }
-
-    /// <summary>
-    /// Build the final SSML string
-    /// </summary>
     public string Build()
     {
-        if (!_isSpeakClosed)
+        if (!_speakClosed)
         {
-            _sb.AppendLine("</speak>");
-            _isSpeakClosed = true;
+            EndProsody();
+            EndVoice();
+            _sb.Append("</speak>");
+            _speakClosed = true;
         }
         return _sb.ToString();
     }

@@ -1,212 +1,184 @@
 using DotNetTtsWrapper.Events;
 using DotNetTtsWrapper.Utils;
+using System.Text.RegularExpressions;
 
 namespace DotNetTtsWrapper.Models;
 
-/// <summary>
-/// Abstract base class for all TTS clients providing unified interface
-/// </summary>
 public abstract class AbstractTtsClient : IDisposable
 {
-    /// <summary>
-    /// Currently selected voice ID
-    /// </summary>
     protected string? VoiceId { get; set; }
-
-    /// <summary>
-    /// Current language (BCP-47 format)
-    /// </summary>
     protected string CurrentLanguage = "en-US";
-
-    /// <summary>
-    /// TTS properties (rate, pitch, volume)
-    /// </summary>
     protected TtsProperties Properties { get; } = new();
-
-    /// <summary>
-    /// SSML builder instance
-    /// </summary>
     protected SsmlBuilder SsmlBuilder { get; } = new();
-
-    /// <summary>
-    /// Audio playback state
-    /// </summary>
     protected PlaybackState PlaybackState { get; } = new();
-
-    /// <summary>
-    /// Word timings for the current audio
-    /// </summary>
     protected List<WordTimingEventArgs> CurrentWordTimings { get; } = new();
-
-    /// <summary>
-    /// Audio sample rate in Hz
-    /// </summary>
     protected int SampleRate { get; set; } = 24000;
-
-    /// <summary>
-    /// Capability flags for this engine
-    /// </summary>
     public EngineCapabilities Capabilities { get; protected set; } = new();
 
-    /// <summary>
-    /// Get all available voices
-    /// </summary>
-    public abstract Task<List<TtsVoice>> GetVoicesAsync();
+    private SpeechMarkdownConverter? _speechMarkdownConverter;
 
-    /// <summary>
-    /// Get voices for a specific language
-    /// </summary>
+    private SpeechMarkdownConverter SpeechMarkdownConverter
+    {
+        get { return _speechMarkdownConverter ??= new SpeechMarkdownConverter(); }
+    }
+
+    public abstract Task<List<TtsVoice>> GetVoicesAsync();
     public abstract Task<List<TtsVoice>> GetVoicesByLanguageAsync(string languageCode);
 
-    /// <summary>
-    /// Set the voice to use for synthesis
-    /// </summary>
     public virtual void SetVoice(string voiceId)
     {
         VoiceId = voiceId ?? throw new ArgumentNullException(nameof(voiceId));
     }
 
-    /// <summary>
-    /// Synthesize text to audio bytes (non-streaming)
-    /// </summary>
     public abstract Task<TtsSynthesisResult> SynthToBytesAsync(string text, TtsOptions? options = null);
-
-    /// <summary>
-    /// Synthesize text with true streaming and word timings
-    /// </summary>
     public abstract Task<StreamingTtsResult> SynthToStreamAsync(string text, TtsOptions? options = null);
-
-    /// <summary>
-    /// Synthesize and save to file
-    /// </summary>
     public abstract Task SynthToFileAsync(string text, string outputPath, AudioFormat format = AudioFormat.Wav, TtsOptions? options = null);
-
-    /// <summary>
-    /// Speak text with audio playback
-    /// </summary>
     public abstract Task SpeakAsync(string text, TtsOptions? options = null);
-
-    /// <summary>
-    /// Speak with streaming playback and word boundary callbacks
-    /// </summary>
     public abstract Task SpeakStreamedAsync(string text, Action<WordTimingEventArgs>? wordCallback = null, TtsOptions? options = null);
-
-    /// <summary>
-    /// Pause audio playback
-    /// </summary>
     public abstract void Pause();
-
-    /// <summary>
-    /// Resume audio playback
-    /// </summary>
     public abstract void Resume();
-
-    /// <summary>
-    /// Stop audio playback
-    /// </summary>
     public abstract void Stop();
-
-    /// <summary>
-    /// Check if credentials are valid
-    /// </summary>
     public abstract Task<CredentialsValidationResult> CheckCredentialsAsync();
 
-    /// <summary>
-    /// Set a TTS property
-    /// </summary>
     public virtual void SetProperty(string propertyName, object value)
     {
         Properties.SetProperty(propertyName, value);
     }
 
-    /// <summary>
-    /// Get a TTS property
-    /// </summary>
     public virtual T? GetProperty<T>(string propertyName)
     {
         return Properties.GetProperty<T>(propertyName);
     }
 
-    // Events
     public event EventHandler<WordTimingEventArgs>? WordBoundary;
     public event EventHandler<SpeechStartedEventArgs>? SpeechStarted;
     public event EventHandler<SpeechCompletedEventArgs>? SpeechCompleted;
 
-    /// <summary>
-    /// Raise word boundary event
-    /// </summary>
     protected virtual void OnWordBoundary(WordTimingEventArgs e)
     {
         WordBoundary?.Invoke(this, e);
         CurrentWordTimings.Add(e);
     }
 
-    /// <summary>
-    /// Raise speech started event
-    /// </summary>
     protected virtual void OnSpeechStarted(SpeechStartedEventArgs e)
     {
         SpeechStarted?.Invoke(this, e);
     }
 
-    /// <summary>
-    /// Raise speech completed event
-    /// </summary>
     protected virtual void OnSpeechCompleted(SpeechCompletedEventArgs e)
     {
         SpeechCompleted?.Invoke(this, e);
     }
 
-    /// <summary>
-    /// Prepare text for synthesis (handle SSML, Speech Markdown, etc.)
-    /// </summary>
+    protected virtual string GetSpeechMarkdownPlatform()
+    {
+        return global::SpeechMarkdown.Platform.W3c;
+    }
+
     protected async Task<string> PrepareTextAsync(string text, TtsOptions? options)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new ArgumentException("Text cannot be empty", nameof(text));
 
-        // Check if text is already SSML
-        bool isSsml = text.TrimStart().StartsWith("<speak", StringComparison.OrdinalIgnoreCase);
         options ??= new TtsOptions();
 
-        if (options.RawSsml || (isSsml && !options.UseSsml))
+        bool isSsml = text.TrimStart().StartsWith("<speak", StringComparison.OrdinalIgnoreCase);
+
+        if (options.RawSsml)
         {
-            return text; // Pass through as-is
+            return text;
         }
 
-        // TODO: Add Speech Markdown conversion here in the future
-        // For now, return text as-is or wrap in SSML if needed
+        if (isSsml)
+        {
+            return text;
+        }
+
+        bool useSpeechMarkdown = NormalizeUseSpeechMarkdown(text, options);
+
+        if (useSpeechMarkdown && SpeechMarkdownConverter.IsSpeechMarkdown(text))
+        {
+            if (Capabilities.SupportsSsml)
+            {
+                var platform = GetSpeechMarkdownPlatform();
+                var ssml = SpeechMarkdownConverter.ToSsml(text, platform);
+                return ssml;
+            }
+            else
+            {
+                var plainText = SpeechMarkdownConverter.ToText(text);
+                return plainText;
+            }
+        }
+
         return text;
     }
 
-    /// <summary>
-    /// Create SSML from plain text with current properties
-    /// </summary>
+    private bool NormalizeUseSpeechMarkdown(string text, TtsOptions options)
+    {
+        if (options.UseSpeechMarkdown.HasValue)
+            return options.UseSpeechMarkdown.Value;
+
+        if (options.RawSsml)
+            return false;
+
+        if (text.TrimStart().StartsWith("<speak", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (!SpeechMarkdownConverter.IsSpeechMarkdown(text))
+            return false;
+
+        return true;
+    }
+
+    protected static bool IsSsml(string text)
+    {
+        return !string.IsNullOrEmpty(text) &&
+               text.TrimStart().StartsWith("<speak", StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected static string StripSsml(string ssml)
+    {
+        if (string.IsNullOrEmpty(ssml))
+            return ssml;
+
+        var content = ssml.Trim();
+
+        if (content.StartsWith("<speak", StringComparison.OrdinalIgnoreCase))
+        {
+            var firstGt = content.IndexOf('>');
+            if (firstGt >= 0)
+                content = content.Substring(firstGt + 1);
+
+            if (content.EndsWith("</speak>", StringComparison.OrdinalIgnoreCase))
+                content = content.Substring(0, content.Length - "</speak>".Length);
+        }
+
+        return Regex.Replace(content, @"<[^>]+>", "").Trim();
+    }
+
     protected string CreateSsml(string text, TtsOptions? options = null)
     {
-        var builder = SsmlBuilder.Speak();
+        var builder = SsmlBuilder.Create();
         builder.Voice(VoiceId ?? "default");
 
-        // Apply properties
-        if (options?.Rate != null || Properties.Rate != null)
-        {
-            var rate = options?.Rate ?? Properties.Rate ?? SpeechRate.Medium;
-            builder = builder.WithRate(rate.ToString().ToLowerInvariant());
-        }
+        var rate = options?.Rate ?? Properties.Rate;
+        var pitch = options?.Pitch ?? Properties.Pitch;
+        var volume = options?.Volume ?? Properties.Volume;
 
-        if (options?.Pitch != null || Properties.Pitch != null)
+        if (rate != null || pitch != null || volume != null)
         {
-            var pitch = options?.Pitch ?? Properties.Pitch ?? SpeechPitch.Medium;
-            builder = builder.WithPitch(pitch.ToString().ToLowerInvariant());
-        }
-
-        if (options?.Volume != null || Properties.Volume != null)
-        {
-            var volume = options?.Volume ?? Properties.Volume ?? 100;
-            builder = builder.WithVolume(volume);
+            builder.BeginProsody(rate, pitch, volume);
         }
 
         builder.AddText(text);
+
+        if (rate != null || pitch != null || volume != null)
+        {
+            builder.EndProsody();
+        }
+
+        builder.EndVoice();
         return builder.Build();
     }
 
@@ -221,6 +193,7 @@ public abstract class AbstractTtsClient : IDisposable
         if (disposing)
         {
             Stop();
+            _speechMarkdownConverter?.Dispose();
         }
     }
 }

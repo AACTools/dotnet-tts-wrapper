@@ -20,7 +20,7 @@ public class WitAiTtsClient : HttpTtsClientBase
             SupportsStreaming = false,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -84,7 +84,7 @@ public class GeminiTtsClient : HttpTtsClientBase
             SupportsStreaming = false,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -163,7 +163,7 @@ public class CartesiaTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -227,7 +227,7 @@ public class DeepgramTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 
@@ -285,7 +285,7 @@ public class HumeTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = false,
             SupportsSsml = false,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true
         };
 

@@ -27,7 +27,7 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
             SupportsStreaming = true, // SherpaOnnx DOES support streaming via callbacks
             SupportsWordTimings = false, // No word boundary events supported
             SupportsSsml = false, // Plain text only
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = false, // Fully offline
             IsWindowsSupported = true,
             IsLinuxSupported = true,

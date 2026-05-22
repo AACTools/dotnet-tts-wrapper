@@ -26,7 +26,7 @@ public class AzureTtsClient : HttpTtsClientBase
             SupportsStreaming = true,
             SupportsWordTimings = true,
             SupportsSsml = true,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,
@@ -34,6 +34,11 @@ public class AzureTtsClient : HttpTtsClientBase
         };
 
         VoiceId = "en-US-AriaNeural";
+    }
+
+    protected override string GetSpeechMarkdownPlatform()
+    {
+        return global::SpeechMarkdown.Platform.MicrosoftAzure;
     }
 
     protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)

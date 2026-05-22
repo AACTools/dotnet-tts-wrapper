@@ -49,6 +49,12 @@ public class TtsOptions
     /// Whether to use SSML input
     /// </summary>
     public bool UseSsml { get; set; } = false;
+
+    /// <summary>
+    /// Whether to treat input as SpeechMarkdown and convert to SSML
+    /// If null, SpeechMarkdown is auto-detected from input text
+    /// </summary>
+    public bool? UseSpeechMarkdown { get; set; }
 }
 
 /// <summary>

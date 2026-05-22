@@ -25,9 +25,9 @@ public class ElevenLabsTtsClient : HttpTtsClientBase
         Capabilities = new EngineCapabilities
         {
             SupportsStreaming = true,
-            SupportsWordTimings = true, // ElevenLabs supports word timings
-            SupportsSsml = false, // ElevenLabs doesn't support standard SSML
-            SupportsSpeechMarkdown = false,
+            SupportsWordTimings = true,
+            SupportsSsml = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,

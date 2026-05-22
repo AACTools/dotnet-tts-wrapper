@@ -6,10 +6,6 @@ using DotNetTtsWrapper.Models;
 
 namespace DotNetTtsWrapper.Engines;
 
-/// <summary>
-/// Azure Cognitive Services TTS Client with Speech SDK
-/// Uses Azure Speech Services SDK for proper word boundaries and streaming
-/// </summary>
 public class AzureSdkTtsClient : AbstractTtsClient
 {
     private readonly AzureCredentials _credentials;
@@ -23,9 +19,9 @@ public class AzureSdkTtsClient : AbstractTtsClient
         Capabilities = new EngineCapabilities
         {
             SupportsStreaming = true,
-            SupportsWordTimings = true, // Real word boundaries via SDK
+            SupportsWordTimings = true,
             SupportsSsml = true,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = true,
             IsWindowsSupported = true,
             IsLinuxSupported = true,
@@ -33,6 +29,11 @@ public class AzureSdkTtsClient : AbstractTtsClient
         };
 
         VoiceId = "en-US-AriaNeural";
+    }
+
+    protected override string GetSpeechMarkdownPlatform()
+    {
+        return global::SpeechMarkdown.Platform.MicrosoftAzure;
     }
 
     private async Task InitializeAsync()
@@ -125,8 +126,9 @@ public class AzureSdkTtsClient : AbstractTtsClient
             };
         }
 
-        // Create a result object to hold the synthesized audio
-        using var result = await _synthesizer.SpeakTextAsync(preparedText);
+        using var result = IsSsml(preparedText)
+            ? await _synthesizer.SpeakSsmlAsync(preparedText)
+            : await _synthesizer.SpeakTextAsync(preparedText);
 
         if (result.Reason == ResultReason.Canceled)
         {
@@ -138,7 +140,6 @@ public class AzureSdkTtsClient : AbstractTtsClient
             throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
         }
 
-        // Get the audio data
         var audioData = result.AudioData;
 
         return new TtsSynthesisResult
@@ -165,11 +166,11 @@ public class AzureSdkTtsClient : AbstractTtsClient
             Channels = 1
         };
 
-        // Azure SDK doesn't support true streaming in the traditional sense,
-        // but we can provide a pull-based stream
         async IAsyncEnumerable<AudioChunkEventArgs> AudioStream()
         {
-            using var result = await _synthesizer.SpeakTextAsync(preparedText);
+            using var result = IsSsml(preparedText)
+                ? await _synthesizer.SpeakSsmlAsync(preparedText)
+                : await _synthesizer.SpeakTextAsync(preparedText);
 
             if (result.Reason != ResultReason.SynthesizingAudioCompleted)
             {
@@ -218,15 +219,16 @@ public class AzureSdkTtsClient : AbstractTtsClient
 
         using var fileSynthesizer = new SpeechSynthesizer(config, null);
 
-        using var result = await fileSynthesizer.SpeakTextAsync(preparedText);
+        using var fileResult = IsSsml(preparedText)
+            ? await fileSynthesizer.SpeakSsmlAsync(preparedText)
+            : await fileSynthesizer.SpeakTextAsync(preparedText);
 
-        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
+        if (fileResult.Reason != ResultReason.SynthesizingAudioCompleted)
         {
-            throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
+            throw new InvalidOperationException($"Speech synthesis failed: {fileResult.Reason}");
         }
 
-        // Save to file
-        await File.WriteAllBytesAsync(outputPath, result.AudioData.ToArray());
+        await File.WriteAllBytesAsync(outputPath, fileResult.AudioData.ToArray());
     }
 
     public override async Task SpeakAsync(string text, TtsOptions? options = null)
@@ -239,10 +241,11 @@ public class AzureSdkTtsClient : AbstractTtsClient
         if (_synthesizer == null)
             throw new InvalidOperationException("Speech synthesizer not initialized");
 
-        // Use SpeakTextAsync for basic synthesis
-        using var result = await _synthesizer.SpeakTextAsync(preparedText);
+        using var speakResult = IsSsml(preparedText)
+            ? await _synthesizer.SpeakSsmlAsync(preparedText)
+            : await _synthesizer.SpeakTextAsync(preparedText);
 
-        if (result.Reason == ResultReason.Canceled)
+        if (speakResult.Reason == ResultReason.Canceled)
         {
             OnSpeechCompleted(new SpeechCompletedEventArgs
             {
@@ -251,13 +254,13 @@ public class AzureSdkTtsClient : AbstractTtsClient
             return;
         }
 
-        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
+        if (speakResult.Reason != ResultReason.SynthesizingAudioCompleted)
         {
             OnSpeechCompleted(new SpeechCompletedEventArgs
             {
-                Error = result.Reason.ToString()
+                Error = speakResult.Reason.ToString()
             });
-            throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
+            throw new InvalidOperationException($"Speech synthesis failed: {speakResult.Reason}");
         }
 
         OnSpeechCompleted(new SpeechCompletedEventArgs());
@@ -273,7 +276,6 @@ public class AzureSdkTtsClient : AbstractTtsClient
         if (_synthesizer == null)
             throw new InvalidOperationException("Speech synthesizer not initialized");
 
-        // Set up word boundary callback if requested
         if (wordCallback != null && options.EnableWordTimings)
         {
             _synthesizer.WordBoundary += (s, e) =>
@@ -287,7 +289,6 @@ public class AzureSdkTtsClient : AbstractTtsClient
             };
         }
 
-        // Register event handlers
         _synthesizer.SynthesisStarted += (s, e) =>
         {
             OnSpeechStarted(new SpeechStartedEventArgs());
@@ -301,16 +302,18 @@ public class AzureSdkTtsClient : AbstractTtsClient
             });
         };
 
-        using var result = await _synthesizer.SpeakTextAsync(preparedText);
+        using var streamedResult = IsSsml(preparedText)
+            ? await _synthesizer.SpeakSsmlAsync(preparedText)
+            : await _synthesizer.SpeakTextAsync(preparedText);
 
-        if (result.Reason == ResultReason.Canceled)
+        if (streamedResult.Reason == ResultReason.Canceled)
         {
             throw new OperationCanceledException("Speech synthesis was canceled");
         }
 
-        if (result.Reason != ResultReason.SynthesizingAudioCompleted)
+        if (streamedResult.Reason != ResultReason.SynthesizingAudioCompleted)
         {
-            throw new InvalidOperationException($"Speech synthesis failed: {result.Reason}");
+            throw new InvalidOperationException($"Speech synthesis failed: {streamedResult.Reason}");
         }
 
         // Clean up event handlers

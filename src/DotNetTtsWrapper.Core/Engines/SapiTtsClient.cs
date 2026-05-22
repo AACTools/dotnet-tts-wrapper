@@ -50,13 +50,12 @@ public class SapiTtsClient : AbstractTtsClient
             // Viseme events can also be used for timing
         };
 
-        // Set capabilities
         Capabilities = new EngineCapabilities
         {
-            SupportsStreaming = false, // SAPI doesn't support true streaming
-            SupportsWordTimings = true, // We can estimate word timings
+            SupportsStreaming = false,
+            SupportsWordTimings = true,
             SupportsSsml = true,
-            SupportsSpeechMarkdown = false,
+            SupportsSpeechMarkdown = true,
             RequiresInternet = false,
             IsWindowsSupported = true,
             IsLinuxSupported = false,
