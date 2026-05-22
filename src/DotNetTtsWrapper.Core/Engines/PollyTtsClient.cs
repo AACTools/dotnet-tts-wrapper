@@ -38,7 +38,7 @@ public class PollyTtsClient : HttpTtsClientBase
         VoiceId = "Joanna";
     }
 
-    protected override string GetSpeechMarkdownPlatform()
+    public override string GetSpeechMarkdownPlatform()
     {
         return global::SpeechMarkdown.Platform.AmazonAlexa;
     }

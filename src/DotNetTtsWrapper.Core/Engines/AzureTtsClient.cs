@@ -36,7 +36,7 @@ public class AzureTtsClient : HttpTtsClientBase
         VoiceId = "en-US-AriaNeural";
     }
 
-    protected override string GetSpeechMarkdownPlatform()
+    public override string GetSpeechMarkdownPlatform()
     {
         return global::SpeechMarkdown.Platform.MicrosoftAzure;
     }

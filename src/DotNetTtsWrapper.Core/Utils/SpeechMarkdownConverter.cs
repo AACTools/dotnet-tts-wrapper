@@ -37,6 +37,16 @@ public class SpeechMarkdownConverter : IDisposable
         return _parser.ParseToJson(markdown);
     }
 
+    public string SupportedSsml(string platform)
+    {
+        return _parser.SupportedSsml(platform);
+    }
+
+    public string ToSmd(string ssml)
+    {
+        return _parser.ToSmd(ssml);
+    }
+
     public void Dispose()
     {
         _parser?.Dispose();

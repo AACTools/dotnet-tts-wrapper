@@ -35,7 +35,7 @@ public class WatsonTtsClient : HttpTtsClientBase
         VoiceId = "en-US_MichaelV3Voice";
     }
 
-    protected override string GetSpeechMarkdownPlatform()
+    public override string GetSpeechMarkdownPlatform()
     {
         return global::SpeechMarkdown.Platform.IbmWatson;
     }

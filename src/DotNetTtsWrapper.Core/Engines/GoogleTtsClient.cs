@@ -41,7 +41,7 @@ public class GoogleTtsClient : HttpTtsClientBase
         VoiceId = "en-US-Wavenet-D";
     }
 
-    protected override string GetSpeechMarkdownPlatform()
+    public override string GetSpeechMarkdownPlatform()
     {
         return global::SpeechMarkdown.Platform.GoogleAssistant;
     }

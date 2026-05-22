@@ -70,7 +70,7 @@ public abstract class AbstractTtsClient : IDisposable
         SpeechCompleted?.Invoke(this, e);
     }
 
-    protected virtual string GetSpeechMarkdownPlatform()
+    public virtual string GetSpeechMarkdownPlatform()
     {
         return global::SpeechMarkdown.Platform.W3c;
     }
