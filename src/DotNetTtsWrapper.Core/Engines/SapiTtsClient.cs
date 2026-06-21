@@ -136,38 +136,25 @@ public class SapiTtsClient : AbstractTtsClient
     }
 
     /// <summary>
-    /// Applies Rate and Volume to the synthesizer and builds SSML with prosody for Pitch.
-    /// Called before every speak/synth operation.
+    /// Builds SSML with rate, pitch, AND volume in a single prosody element.
+    /// When using SpeakSsml(), the synthesizer's native Rate/Volume properties
+    /// are IGNORED — everything must be in the SSML prosody for independence.
     /// </summary>
-    private void ApplyOptions(TtsOptions? options)
+    private static string BuildSsmlWithProsody(string text, TtsOptions? options)
     {
         options ??= new TtsOptions();
 
-        // Rate: map enum to -10..10 range
-        _synthesizer.Rate = options.Rate switch
+        var rateStr = options.Rate switch
         {
-            SpeechRate.XSlow => -5,
-            SpeechRate.Slow => -2,
-            SpeechRate.Medium => 0,
-            SpeechRate.Fast => 3,
-            SpeechRate.XFast => 6,
-            _ => 0
+            SpeechRate.XSlow => "x-slow",
+            SpeechRate.Slow => "slow",
+            SpeechRate.Medium => "medium",
+            SpeechRate.Fast => "fast",
+            SpeechRate.XFast => "x-fast",
+            _ => "medium"
         };
 
-        // Volume: 0-100
-        _synthesizer.Volume = options.Volume ?? 80;
-    }
-
-    /// <summary>
-    /// Wraps text in SSML prosody for pitch control (SpeechSynthesizer has no Pitch property).
-    /// If the text is already SSML, applies the pitch via the existing SSML structure.
-    /// </summary>
-    private static string WrapWithPitchProsody(string text, TtsOptions? options)
-    {
-        if (options?.Pitch is not { } pitch || pitch == SpeechPitch.Medium)
-            return text;
-
-        var pitchStr = pitch switch
+        var pitchStr = options.Pitch switch
         {
             SpeechPitch.XLow => "x-low",
             SpeechPitch.Low => "low",
@@ -177,16 +164,21 @@ public class SapiTtsClient : AbstractTtsClient
             _ => "medium"
         };
 
+        var volumeStr = Math.Clamp(options.Volume ?? 80, 0, 100).ToString();
+
         // If already SSML, inject prosody inside the <speak> root
         if (text.TrimStart().StartsWith("<speak", StringComparison.OrdinalIgnoreCase))
         {
-            return text.Replace("<speak", $"<speak><prosody pitch=\"{pitchStr}\">", StringComparison.OrdinalIgnoreCase)
+            var prosody = $"<prosody rate=\"{rateStr}\" pitch=\"{pitchStr}\" volume=\"{volumeStr}\">";
+            return text.Replace("<speak", $"<speak>{prosody}", StringComparison.OrdinalIgnoreCase)
                        .Replace("</speak>", "</prosody></speak>", StringComparison.OrdinalIgnoreCase);
         }
 
         // Otherwise wrap in SSML
         var escaped = XmlEncode(text);
-        return $"<speak version=\"1.0\" xml:lang=\"en-US\"><prosody pitch=\"{pitchStr}\">{escaped}</prosody></speak>";
+        return $"<speak version=\"1.0\" xml:lang=\"en-US\">" +
+               $"<prosody rate=\"{rateStr}\" pitch=\"{pitchStr}\" volume=\"{volumeStr}\">{escaped}</prosody>" +
+               $"</speak>";
     }
 
     private static string XmlEncode(string text)
@@ -219,9 +211,8 @@ public class SapiTtsClient : AbstractTtsClient
         await _synthesisLock.WaitAsync();
         try
         {
-            ApplyOptions(options);
             var preparedText = await PrepareTextAsync(text, options);
-            preparedText = WrapWithPitchProsody(preparedText, options);
+            preparedText = BuildSsmlWithProsody(preparedText, options);
 
             // Use MemoryStream to capture audio
             using var stream = new MemoryStream();
@@ -290,9 +281,8 @@ public class SapiTtsClient : AbstractTtsClient
         await _synthesisLock.WaitAsync();
         try
         {
-            ApplyOptions(options);
             var preparedText = await PrepareTextAsync(text, options);
-            preparedText = WrapWithPitchProsody(preparedText, options);
+            preparedText = BuildSsmlWithProsody(preparedText, options);
 
             // Set output to file
             _synthesizer.SetOutputToWaveFile(outputPath);
@@ -321,9 +311,8 @@ public class SapiTtsClient : AbstractTtsClient
         await _synthesisLock.WaitAsync();
         try
         {
-            ApplyOptions(options);
             var preparedText = await PrepareTextAsync(text, options);
-            preparedText = WrapWithPitchProsody(preparedText, options);
+            preparedText = BuildSsmlWithProsody(preparedText, options);
             _playbackCts = new CancellationTokenSource();
 
             // Setup word timing tracking if enabled
