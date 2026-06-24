@@ -11,6 +11,27 @@ public class SherpaOnnxCredentials : ITtsCredentials
     public string? ModelPath { get; set; }
 
     /// <summary>
+    /// Explicit path to the .onnx model file (overrides ModelPath derivation).
+    /// Use this when the model file is not named "model.onnx".
+    /// </summary>
+    public string? ModelFilePath { get; set; }
+
+    /// <summary>
+    /// Explicit path to tokens.txt (overrides ModelPath derivation).
+    /// </summary>
+    public string? TokensFilePath { get; set; }
+
+    /// <summary>
+    /// Explicit path to espeak-ng-data directory (overrides ModelPath derivation).
+    /// </summary>
+    public string? DataDirPath { get; set; }
+
+    /// <summary>
+    /// Explicit path to lexicon file (overrides ModelPath derivation).
+    /// </summary>
+    public string? LexiconFilePath { get; set; }
+
+    /// <summary>
     /// Voice model ID (e.g., "kokoro-en-en-19", "vits-piper-en_US-amy-low")
     /// </summary>
     public string? ModelId { get; set; }

@@ -117,13 +117,29 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
 
     private async Task<ModelConfiguration> GetModelConfigurationAsync(string modelId)
     {
-        // Check if we have a custom model path
+        // Check if we have explicit file paths (e.g., from SAPI token config)
+        if (!string.IsNullOrEmpty(_credentials.ModelFilePath))
+        {
+            var modelDir = !string.IsNullOrEmpty(_credentials.ModelPath)
+                ? _credentials.ModelPath
+                : Path.GetDirectoryName(_credentials.ModelFilePath) ?? "";
+            return new ModelConfiguration
+            {
+                ModelType = DetermineModelTypeFromPath(modelDir),
+                ModelPath = _credentials.ModelFilePath,
+                TokensPath = _credentials.TokensFilePath ?? Path.Combine(modelDir, "tokens.txt"),
+                DataDir = _credentials.DataDirPath ?? Path.Combine(modelDir, "espeak-ng-data"),
+                LexiconPath = _credentials.LexiconFilePath ?? Path.Combine(modelDir, "lexicon.txt")
+            };
+        }
+
+        // Check if we have a custom model directory path
         if (!string.IsNullOrEmpty(_credentials.ModelPath))
         {
             return new ModelConfiguration
             {
                 ModelType = DetermineModelTypeFromPath(_credentials.ModelPath),
-                ModelPath = _credentials.ModelPath,
+                ModelPath = Path.Combine(_credentials.ModelPath, "model.onnx"),
                 TokensPath = Path.Combine(_credentials.ModelPath, "tokens.txt"),
                 DataDir = Path.Combine(_credentials.ModelPath, "espeak-ng-data"),
                 LexiconPath = Path.Combine(_credentials.ModelPath, "lexicon.txt")
