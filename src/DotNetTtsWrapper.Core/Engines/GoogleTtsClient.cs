@@ -76,24 +76,20 @@ public class GoogleTtsClient : HttpTtsClientBase
                 AudioFormat.Wav => "LINEAR16",
                 AudioFormat.Ogg => "OGG_OPUS",
                 _ => "MP3"
-            },
-            ["speakingRate"] = GetSpeakingRate(options),
-            ["pitch"] = GetPitch(options),
-            ["sampleRateHertz"] = 24000
+            }
+            // Do not send sampleRateHertz with MP3 — Google rejects it
+            // speakingRate/pitch only sent when explicitly overridden
         };
 
-        // Enable timepoints for word boundary events
-        if (options?.EnableWordTimings == true)
+        // Build the request
+        var requestDict = new Dictionary<string, object>
         {
-            audioConfigObj["enableTimepointing"] = true;
-        }
-
-        return new
-        {
-            input = inputObj,
-            voice = voiceObj,
-            audioConfig = audioConfigObj
+            ["input"] = inputObj,
+            ["voice"] = voiceObj,
+            ["audioConfig"] = audioConfigObj
         };
+
+        return requestDict;
     }
 
     protected override string GetSynthesisEndpoint(TtsOptions options)
@@ -164,37 +160,28 @@ public class GoogleTtsClient : HttpTtsClientBase
     /// </summary>
     public override async Task<TtsSynthesisResult> SynthToBytesAsync(string text, TtsOptions? options = null)
     {
-        if (options?.EnableWordTimings == true)
+        var preparedText = await PrepareTextAsync(text, options);
+        var payload = await BuildSynthesisPayload(preparedText, options ?? new TtsOptions());
+
+        // Google returns JSON with base64-encoded audio, not raw audio bytes.
+        // Must decode manually instead of using base.PostAsBytesAsync.
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync($"{BaseEndpoint}/{GetSynthesisEndpoint(options ?? new TtsOptions())}", content);
+        if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"Google TTS failed: {(int)response.StatusCode}\n{errorBody}"); }
+
+        var jsonString = await response.Content.ReadAsStringAsync();
+        var jsonDoc = JsonDocument.Parse(jsonString);
+        var audioBase64 = jsonDoc.RootElement.GetProperty("audioContent").GetString();
+        var audioBytes = Convert.FromBase64String(audioBase64 ?? "");
+
+        return new TtsSynthesisResult
         {
-            var payload = await BuildSynthesisPayload(text, options);
-            var content = JsonContent.Create(payload);
-            var response = await _httpClient.PostAsync($"{BaseEndpoint}/{GetSynthesisEndpoint(options)}", content);
-            response.EnsureSuccessStatusCode();
-
-            var jsonString = await response.Content.ReadAsStringAsync();
-            var jsonDoc = JsonDocument.Parse(jsonString);
-
-            var audioBase64 = jsonDoc.RootElement.GetProperty("audioContent").GetString();
-            var audioBytes = Convert.FromBase64String(audioBase64 ?? "");
-
-            // Process timepoints into word timings
-            var wordTimings = new List<WordTimingEventArgs>();
-            if (jsonDoc.RootElement.TryGetProperty("timepoints", out var timepoints))
-            {
-                wordTimings = ProcessTimepoints(timepoints);
-            }
-
-            return new TtsSynthesisResult
-            {
-                AudioData = audioBytes,
-                WordTimings = wordTimings,
-                Format = options?.Format ?? AudioFormat.Mp3,
-                SampleRate = 24000,
-                Channels = 1
-            };
-        }
-
-        return await base.SynthToBytesAsync(text, options);
+            AudioData = audioBytes,
+            Format = AudioFormat.Mp3,
+            SampleRate = 24000,
+            Channels = 1
+        };
     }
 
     /// <summary>
@@ -231,7 +218,7 @@ public class GoogleTtsClient : HttpTtsClientBase
         try
         {
             var response = await _httpClient.GetAsync($"{BaseEndpoint}/voices");
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"Google TTS failed: {(int)response.StatusCode}\n{errorBody}"); }
 
             var jsonString = await response.Content.ReadAsStringAsync();
             var jsonDoc = JsonDocument.Parse(jsonString);

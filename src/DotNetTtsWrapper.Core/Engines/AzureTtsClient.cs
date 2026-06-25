@@ -70,7 +70,7 @@ public class AzureTtsClient : HttpTtsClientBase
         try
         {
             var response = await _httpClient.GetAsync($"{BaseEndpoint}/voices/list");
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"Azure TTS failed: {(int)response.StatusCode}\n{errorBody}"); }
 
             var jsonString = await response.Content.ReadAsStringAsync();
             var jsonDoc = JsonDocument.Parse(jsonString);
@@ -118,7 +118,7 @@ public class AzureTtsClient : HttpTtsClientBase
         var url = $"{BaseEndpoint}/{GetSynthesisEndpoint(options!)}";
 
         var response = await _httpClient.PostAsync(url, content);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"Azure TTS failed: {(int)response.StatusCode}\n{errorBody}"); }
 
         var audioData = await response.Content.ReadAsByteArrayAsync();
         return new TtsSynthesisResult

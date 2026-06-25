@@ -92,14 +92,18 @@ public class PollyTtsClient : HttpTtsClientBase
         var authorization = $"AWS4-HMAC-SHA256 Credential={_credentials.AccessKeyId}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
 
         var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Headers.Add("X-Amz-Date", amzDate);
-        request.Headers.Add("X-Amz-Target", "Amazon.Polly_20160620");
-        request.Headers.Add("Authorization", authorization);
-        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-        request.Content.Headers.Add("x-amz-content-sha256", bodyHash);
+        request.Headers.TryAddWithoutValidation("X-Amz-Date", amzDate);
+        request.Headers.TryAddWithoutValidation("X-Amz-Target", "Amazon.Polly_20160620");
+        request.Headers.TryAddWithoutValidation("Authorization", authorization);
+        // Use ByteArrayContent to avoid .NET appending charset=utf-8 to Content-Type
+        // AWS Sig V4 signs the exact content-type value, charset mismatch causes 403
+        var content = new ByteArrayContent(bodyBytes);
+        content.Headers.TryAddWithoutValidation("Content-Type", "application/json");
+        content.Headers.TryAddWithoutValidation("x-amz-content-sha256", bodyHash);
+        request.Content = content;
 
         var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"Polly TTS failed: {(int)response.StatusCode}\n{errorBody}"); }
 
         var audioData = await response.Content.ReadAsByteArrayAsync();
         return new TtsSynthesisResult
@@ -136,7 +140,7 @@ public class PollyTtsClient : HttpTtsClientBase
                 $"{BaseEndpoint}/v1/voices",
                 JsonContent.Create(new { })
             );
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"Polly TTS failed: {(int)response.StatusCode}\n{errorBody}"); }
 
             var jsonString = await response.Content.ReadAsStringAsync();
             var jsonDoc = JsonDocument.Parse(jsonString);

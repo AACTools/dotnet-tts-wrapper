@@ -60,7 +60,12 @@ public abstract class HttpTtsClientBase : AbstractTtsClient
             var content = payload != null ? JsonContent.Create(payload) : null;
 
             var response = await _httpClient.PostAsync(fullUrl, content);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException(
+                    $"TTS request failed: {(int)response.StatusCode} {response.StatusCode}\n{errorBody}");
+            }
 
             return await response.Content.ReadAsByteArrayAsync();
         }
@@ -82,7 +87,7 @@ public abstract class HttpTtsClientBase : AbstractTtsClient
             var content = payload != null ? JsonContent.Create(payload) : null;
 
             var response = await _httpClient.PostAsync(fullUrl, content);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"TTS request failed: {(int)response.StatusCode} {response.StatusCode}\n{errorBody}"); }
 
             return await response.Content.ReadAsStreamAsync();
         }
@@ -104,7 +109,7 @@ public abstract class HttpTtsClientBase : AbstractTtsClient
             var content = payload != null ? JsonContent.Create(payload) : null;
 
             var response = await _httpClient.PostAsync(fullUrl, content);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"TTS request failed: {(int)response.StatusCode} {response.StatusCode}\n{errorBody}"); }
 
             return await response.Content.ReadFromJsonAsync<T>() ??
                    throw new InvalidOperationException("Failed to deserialize JSON response");
@@ -125,7 +130,7 @@ public abstract class HttpTtsClientBase : AbstractTtsClient
         {
             var fullUrl = $"{BaseEndpoint.TrimEnd('/')}/{endpoint.TrimStart('/')}";
             var response = await _httpClient.GetAsync(fullUrl);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) { var errorBody = await response.Content.ReadAsStringAsync(); throw new HttpRequestException($"TTS request failed: {(int)response.StatusCode} {response.StatusCode}\n{errorBody}"); }
 
             return await response.Content.ReadFromJsonAsync<T>() ??
                    throw new InvalidOperationException("Failed to deserialize JSON response");
