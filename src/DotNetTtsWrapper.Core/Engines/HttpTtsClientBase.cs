@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using DotNetTtsWrapper.Utils;
 using System.Text;
 using System.Text.Json;
 using DotNetTtsWrapper.Events;
@@ -149,10 +150,18 @@ public abstract class HttpTtsClientBase : AbstractTtsClient
         var payload = await BuildSynthesisPayload(preparedText, options);
         var audioData = await PostAsBytesAsync(GetSynthesisEndpoint(options), payload);
 
+        var wordTimings = CurrentWordTimings;
+        if ((wordTimings == null || wordTimings.Count == 0) && options.EnableWordTimings != false)
+        {
+            var estimated = WordTimingEstimator.EstimateWordBoundaries(preparedText);
+            wordTimings = estimated.Select(w => new Events.WordTimingEventArgs(
+                w.Word, w.StartSeconds, w.EndSeconds)).ToList();
+        }
+
         return new TtsSynthesisResult
         {
             AudioData = audioData,
-            WordTimings = CurrentWordTimings,
+            WordTimings = wordTimings,
             Format = options.Format,
             SampleRate = SampleRate
         };
