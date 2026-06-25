@@ -45,7 +45,12 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
         try
         {
             var assembly = typeof(SherpaOnnxTtsClient).Assembly;
-            var resourceStream = assembly.GetManifestResourceStream("DotNetTtsWrapper.Models.merged_models.json");
+            // Resource name includes the full default namespace (DotNetTtsWrapper.Core)
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("merged_models.json"));
+            var resourceStream = resourceName != null
+                ? assembly.GetManifestResourceStream(resourceName)
+                : null;
 
             if (resourceStream != null)
             {
@@ -280,14 +285,20 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
             return languageCodes;
 
         foreach (var lang in languages)
-        {
-            languageCodes.Add(new LanguageInfo
             {
-                Bcp47 = lang.LangCode ?? "en-US",
-                Iso639_3 = lang.LanguageName?.Substring(0, 2) ?? "en",
-                Display = lang.LanguageName ?? "English"
-            });
-        }
+                var langCode = lang.LangCode ?? "en";
+                var country = lang.Country ?? "";
+                var bcp47 = string.IsNullOrEmpty(country)
+                    ? langCode
+                    : $"{langCode}-{country.ToUpperInvariant()}";
+                
+                languageCodes.Add(new LanguageInfo
+                {
+                    Bcp47 = bcp47,
+                    Iso639_3 = langCode,
+                    Display = lang.LanguageName ?? langCode
+                });
+            }
 
         return languageCodes;
     }
@@ -709,8 +720,11 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
     /// </summary>
     private class SherpaOnnxLanguage
     {
+        [System.Text.Json.Serialization.JsonPropertyName("lang_code")]
         public string? LangCode { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("language_name")]
         public string? LanguageName { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("country")]
         public string? Country { get; set; }
     }
 }
