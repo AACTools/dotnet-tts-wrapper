@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using System.Speech.Synthesis;
 using System.Xml;
 using DotNetTtsWrapper.Events;
@@ -9,6 +10,7 @@ namespace DotNetTtsWrapper.Engines;
 /// Windows SAPI (Speech API) TTS Client
 /// Uses the built-in Windows Speech API via System.Speech
 /// </summary>
+[SupportedOSPlatform("windows")]
 public class SapiTtsClient : AbstractTtsClient
 {
     private readonly SpeechSynthesizer _synthesizer;

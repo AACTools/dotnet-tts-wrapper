@@ -20,7 +20,7 @@ public static class TtsFactory
         AbstractTtsClient client = normalizedEngine switch
         {
             // Windows engines
-            "sapi" => new SapiTtsClient(),
+            "sapi" => OperatingSystem.IsWindows() ? new SapiTtsClient() : throw new PlatformNotSupportedException("SAPI is only supported on Windows"),
             "azure" => new AzureSdkTtsClient((credentials as AzureCredentials)!),
             "sherpaonnx" => new SherpaOnnxTtsClient((credentials as SherpaOnnxCredentials)!),
 
