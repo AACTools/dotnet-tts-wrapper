@@ -59,10 +59,13 @@ public class GoogleTtsClient : HttpTtsClientBase
             inputObj["text"] = text;
         }
 
+        var voiceName = options?.VoiceId ?? VoiceId ?? "en-US-Wavenet-D";
+        var languageCode = DeriveLanguageCode(voiceName);
+
         var voiceObj = new Dictionary<string, object>
         {
-            ["languageCode"] = "en-US",
-            ["name"] = options?.VoiceId ?? VoiceId ?? "en-US-Wavenet-D"
+            ["languageCode"] = languageCode,
+            ["name"] = voiceName
         };
 
         var audioConfigObj = new Dictionary<string, object>
@@ -96,6 +99,16 @@ public class GoogleTtsClient : HttpTtsClientBase
     protected override string GetSynthesisEndpoint(TtsOptions options)
     {
         return "text:synthesize";
+    }
+
+    private static string DeriveLanguageCode(string voiceName)
+    {
+        if (string.IsNullOrEmpty(voiceName) || voiceName.Length < 5)
+            return "en-US";
+        var parts = voiceName.Split('-');
+        if (parts.Length >= 2)
+            return $"{parts[0]}-{parts[1]}";
+        return "en-US";
     }
 
     /// <summary>

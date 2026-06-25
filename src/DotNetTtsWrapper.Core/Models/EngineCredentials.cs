@@ -130,6 +130,7 @@ public class PollyCredentials : ITtsCredentials
 public class OpenAICredentials : ApiKeyCredentials
 {
     public string OrganizationId { get; set; } = string.Empty;
+    public string Model { get; set; } = "tts-1";
 
     protected override async Task<CredentialsValidationResult> ValidateApiKeyAsync()
     {
@@ -146,6 +147,10 @@ public class OpenAICredentials : ApiKeyCredentials
 /// </summary>
 public class ElevenLabsCredentials : ApiKeyCredentials
 {
+    public string ModelId { get; set; } = "eleven_multilingual_v2";
+    public float Stability { get; set; } = 0.5f;
+    public float SimilarityBoost { get; set; } = 0.75f;
+
     protected override async Task<CredentialsValidationResult> ValidateApiKeyAsync()
     {
         return new CredentialsValidationResult

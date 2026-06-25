@@ -42,11 +42,11 @@ public class ElevenLabsTtsClient : HttpTtsClientBase
         return new
         {
             text = text,
-            model_id = "eleven_multilingual_v2", // or eleven_monolingual_v1
+            model_id = _credentials.ModelId,
             voice_settings = new
             {
-                stability = 0.5,
-                similarity_boost = 0.75
+                stability = _credentials.Stability,
+                similarity_boost = _credentials.SimilarityBoost
             }
         };
     }

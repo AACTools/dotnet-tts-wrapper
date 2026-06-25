@@ -19,6 +19,8 @@ public class OpenAITtsClient : HttpTtsClientBase
     {
         _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
         SetAuthentication("Bearer", _credentials.ApiKey);
+        if (!string.IsNullOrWhiteSpace(_credentials.OrganizationId))
+            _httpClient.DefaultRequestHeaders.Add("OpenAI-Organization", _credentials.OrganizationId);
 
         Capabilities = new EngineCapabilities
         {
@@ -32,14 +34,14 @@ public class OpenAITtsClient : HttpTtsClientBase
             IsMacOsSupported = true
         };
 
-        VoiceId = "alloy"; // Default voice
+        VoiceId = "alloy";
     }
 
     protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)
     {
         return new
         {
-            model = "tts-1", // or tts-1-hd for higher quality
+            model = _credentials.Model,
             input = text,
             voice = options.VoiceId ?? VoiceId ?? "alloy",
             response_format = options.Format switch
@@ -48,7 +50,7 @@ public class OpenAITtsClient : HttpTtsClientBase
                 AudioFormat.Opus => "opus",
                 AudioFormat.Aac => "aac",
                 AudioFormat.Flac => "flac",
-                _ => "mp3" // default
+                _ => "mp3"
             },
             speed = GetSpeedValue(options)
         };

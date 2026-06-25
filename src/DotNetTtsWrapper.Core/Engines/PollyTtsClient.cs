@@ -1,12 +1,14 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DotNetTtsWrapper.Models;
 
 namespace DotNetTtsWrapper.Engines;
 
 /// <summary>
-/// AWS Polly TTS Client
-/// Uses AWS Polly REST API
+/// AWS Polly TTS Client with proper AWS Signature Version 4 authentication.
 /// </summary>
 public class PollyTtsClient : HttpTtsClientBase
 {
@@ -18,10 +20,6 @@ public class PollyTtsClient : HttpTtsClientBase
     public PollyTtsClient(PollyCredentials credentials)
     {
         _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
-
-        // Set AWS signature headers
-        SetApiKeyHeader("X-Amz-Target", "Amazon.Polly_20160620");
-        SetAuthentication("AWS4-HMAC-SHA256", $"{_credentials.AccessKeyId}/{_credentials.Region}/polly/aws4_request");
 
         Capabilities = new EngineCapabilities
         {
@@ -43,7 +41,7 @@ public class PollyTtsClient : HttpTtsClientBase
         return global::SpeechMarkdown.Platform.AmazonAlexa;
     }
 
-    protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options)
+    private object BuildPayload(string text, TtsOptions options)
     {
         return new
         {
@@ -61,10 +59,69 @@ public class PollyTtsClient : HttpTtsClientBase
         };
     }
 
-    protected override string GetSynthesisEndpoint(TtsOptions options)
+    public override async Task<TtsSynthesisResult> SynthToBytesAsync(string text, TtsOptions? options = null)
     {
-        return "v1/speech";
+        var preparedText = await PrepareTextAsync(text, options);
+        var payload = BuildPayload(preparedText, options);
+        var body = JsonSerializer.Serialize(payload);
+        var bodyBytes = Encoding.UTF8.GetBytes(body);
+        var bodyHash = HexEncode(SHA256.HashData(bodyBytes));
+
+        var url = $"{BaseEndpoint}/v1/speech";
+        var uri = new Uri(url);
+        var now = DateTime.UtcNow;
+        var amzDate = now.ToString("yyyyMMddTHHmmssZ");
+        var dateStamp = now.ToString("yyyyMMdd");
+
+        var signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date;x-amz-target";
+        var canonicalHeaders = $"content-type:application/json\nhost:{uri.Host}\nx-amz-content-sha256:{bodyHash}\nx-amz-date:{amzDate}\nx-amz-target:Amazon.Polly_20160620\n";
+
+        var canonicalRequest = $"POST\n{uri.AbsolutePath}\n\n{canonicalHeaders}\n{signedHeaders}\n{bodyHash}";
+        var canonicalHash = HexEncode(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest)));
+
+        var credentialScope = $"{dateStamp}/{_credentials.Region}/polly/aws4_request";
+        var stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{canonicalHash}";
+
+        var kSecret = Encoding.UTF8.GetBytes($"AWS4{_credentials.SecretAccessKey}");
+        var kDate = HMACSHA256(kSecret, Encoding.UTF8.GetBytes(dateStamp));
+        var kRegion = HMACSHA256(kDate, Encoding.UTF8.GetBytes(_credentials.Region));
+        var kService = HMACSHA256(kRegion, Encoding.UTF8.GetBytes("polly"));
+        var kSigning = HMACSHA256(kService, Encoding.UTF8.GetBytes("aws4_request"));
+        var signature = HexEncode(HMACSHA256(kSigning, Encoding.UTF8.GetBytes(stringToSign)));
+
+        var authorization = $"AWS4-HMAC-SHA256 Credential={_credentials.AccessKeyId}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
+
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
+        request.Headers.Add("X-Amz-Date", amzDate);
+        request.Headers.Add("X-Amz-Target", "Amazon.Polly_20160620");
+        request.Headers.Add("Authorization", authorization);
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        request.Content.Headers.Add("x-amz-content-sha256", bodyHash);
+
+        var response = await _httpClient.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        var audioData = await response.Content.ReadAsByteArrayAsync();
+        return new TtsSynthesisResult
+        {
+            AudioData = audioData,
+            Format = AudioFormat.Mp3,
+            SampleRate = 16000,
+            Channels = 1
+        };
     }
+
+    protected override async Task<object> BuildSynthesisPayload(string text, TtsOptions options) => BuildPayload(text, options);
+
+    protected override string GetSynthesisEndpoint(TtsOptions options) => "v1/speech";
+
+    private static byte[] HMACSHA256(byte[] key, byte[] data)
+    {
+        using var hmac = new System.Security.Cryptography.HMACSHA256(key);
+        return hmac.ComputeHash(data);
+    }
+
+    private static string HexEncode(byte[] bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
 
     protected override string GetStreamingEndpoint(TtsOptions options)
     {
