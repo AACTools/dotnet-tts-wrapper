@@ -110,12 +110,14 @@ public class AzureSdkTtsClient : AbstractTtsClient
         options ??= new TtsOptions();
         var preparedText = await PrepareTextAsync(text, options);
 
+        var synthesizer = _synthesizer ?? throw new InvalidOperationException("Speech synthesizer not initialized");
+
         var wordTimings = new List<WordTimingEventArgs>();
 
         // Subscribe to word boundary events if enabled
         if (options.EnableWordTimings)
         {
-            _synthesizer.WordBoundary += (s, e) =>
+            synthesizer.WordBoundary += (s, e) =>
             {
                 var wordTiming = new WordTimingEventArgs(
                     e.Text ?? "",
@@ -127,8 +129,8 @@ public class AzureSdkTtsClient : AbstractTtsClient
         }
 
         using var result = IsSsml(preparedText)
-            ? await _synthesizer.SpeakSsmlAsync(preparedText)
-            : await _synthesizer.SpeakTextAsync(preparedText);
+            ? await synthesizer.SpeakSsmlAsync(preparedText)
+            : await synthesizer.SpeakTextAsync(preparedText);
 
         if (result.Reason == ResultReason.Canceled)
         {
@@ -159,6 +161,8 @@ public class AzureSdkTtsClient : AbstractTtsClient
         options ??= new TtsOptions();
         var preparedText = await PrepareTextAsync(text, options);
 
+        var synthesizer = _synthesizer ?? throw new InvalidOperationException("Speech synthesizer not initialized");
+
         var streamingResult = new StreamingTtsResult
         {
             Format = AudioFormat.Mp3,
@@ -169,8 +173,8 @@ public class AzureSdkTtsClient : AbstractTtsClient
         async IAsyncEnumerable<AudioChunkEventArgs> AudioStream()
         {
             using var result = IsSsml(preparedText)
-                ? await _synthesizer.SpeakSsmlAsync(preparedText)
-                : await _synthesizer.SpeakTextAsync(preparedText);
+                ? await synthesizer.SpeakSsmlAsync(preparedText)
+                : await synthesizer.SpeakTextAsync(preparedText);
 
             if (result.Reason != ResultReason.SynthesizingAudioCompleted)
             {

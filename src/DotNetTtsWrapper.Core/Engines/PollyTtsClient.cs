@@ -41,7 +41,7 @@ public class PollyTtsClient : HttpTtsClientBase
         return global::SpeechMarkdown.Platform.AmazonAlexa;
     }
 
-    private object BuildPayload(string text, TtsOptions options)
+    private object BuildPayload(string text, TtsOptions? options)
     {
         return new
         {

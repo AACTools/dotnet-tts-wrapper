@@ -199,11 +199,6 @@ public class SapiTtsClient : AbstractTtsClient
         return sb.ToString();
     }
 
-    private bool IsSsml(string text)
-    {
-        return text.TrimStart().StartsWith("<speak", StringComparison.OrdinalIgnoreCase);
-    }
-
     public override async Task<TtsSynthesisResult> SynthToBytesAsync(string text, TtsOptions? options = null)
     {
         options ??= new TtsOptions();

@@ -161,7 +161,7 @@ public abstract class HttpTtsClientBase : AbstractTtsClient
         return new TtsSynthesisResult
         {
             AudioData = audioData,
-            WordTimings = wordTimings,
+            WordTimings = wordTimings ?? new List<WordTimingEventArgs>(),
             Format = options.Format,
             SampleRate = SampleRate
         };

@@ -21,29 +21,29 @@ public static class TtsFactory
         {
             // Windows engines
             "sapi" => new SapiTtsClient(),
-            "azure" => new AzureSdkTtsClient(credentials as AzureCredentials),
-            "sherpaonnx" => new SherpaOnnxTtsClient(credentials as SherpaOnnxCredentials),
+            "azure" => new AzureSdkTtsClient((credentials as AzureCredentials)!),
+            "sherpaonnx" => new SherpaOnnxTtsClient((credentials as SherpaOnnxCredentials)!),
 
             // Cloud engines
-            "google" => new GoogleTtsClient(credentials as GoogleCredentials),
-            "polly" => new PollyTtsClient(credentials as PollyCredentials),
-            "openai" => new OpenAITtsClient(credentials as OpenAICredentials),
-            "elevenlabs" => new ElevenLabsTtsClient(credentials as ElevenLabsCredentials),
-            "watson" => new WatsonTtsClient(credentials as WatsonCredentials),
-            "playht" => new PlayHtTtsClient(credentials as PlayHtCredentials),
-            "witai" => new WitAiTtsClient(credentials as WitAiCredentials),
-            "gemini" => new GeminiTtsClient(credentials as GeminiCredentials),
-            "cartesia" => new CartesiaTtsClient(credentials as CartesiaCredentials),
-            "deepgram" => new DeepgramTtsClient(credentials as DeepgramCredentials),
-            "hume" => new HumeTtsClient(credentials as HumeCredentials),
-            "xai" => new XaiTtsClient(credentials as XaiCredentials),
-            "fishaudio" => new FishAudioTtsClient(credentials as FishAudioCredentials),
-            "mistral" => new MistralTtsClient(credentials as MistralCredentials),
-            "murf" => new MurfTtsClient(credentials as MurfCredentials),
-            "unrealspeech" => new UnrealSpeechTtsClient(credentials as UnrealSpeechCredentials),
-            "resemble" => new ResembleTtsClient(credentials as ResembleCredentials),
-            "upliftai" => new UpliftAiTtsClient(credentials as UpliftAiCredentials),
-            "modelslab" => new ModelsLabTtsClient(credentials as ModelsLabCredentials),
+            "google" => new GoogleTtsClient((credentials as GoogleCredentials)!),
+            "polly" => new PollyTtsClient((credentials as PollyCredentials)!),
+            "openai" => new OpenAITtsClient((credentials as OpenAICredentials)!),
+            "elevenlabs" => new ElevenLabsTtsClient((credentials as ElevenLabsCredentials)!),
+            "watson" => new WatsonTtsClient((credentials as WatsonCredentials)!),
+            "playht" => new PlayHtTtsClient((credentials as PlayHtCredentials)!),
+            "witai" => new WitAiTtsClient((credentials as WitAiCredentials)!),
+            "gemini" => new GeminiTtsClient((credentials as GeminiCredentials)!),
+            "cartesia" => new CartesiaTtsClient((credentials as CartesiaCredentials)!),
+            "deepgram" => new DeepgramTtsClient((credentials as DeepgramCredentials)!),
+            "hume" => new HumeTtsClient((credentials as HumeCredentials)!),
+            "xai" => new XaiTtsClient((credentials as XaiCredentials)!),
+            "fishaudio" => new FishAudioTtsClient((credentials as FishAudioCredentials)!),
+            "mistral" => new MistralTtsClient((credentials as MistralCredentials)!),
+            "murf" => new MurfTtsClient((credentials as MurfCredentials)!),
+            "unrealspeech" => new UnrealSpeechTtsClient((credentials as UnrealSpeechCredentials)!),
+            "resemble" => new ResembleTtsClient((credentials as ResembleCredentials)!),
+            "upliftai" => new UpliftAiTtsClient((credentials as UpliftAiCredentials)!),
+            "modelslab" => new ModelsLabTtsClient((credentials as ModelsLabCredentials)!),
 
             // Local engines (will be implemented later)
             "espeak" => throw new NotImplementedException("eSpeak support coming soon"),
@@ -53,7 +53,7 @@ public static class TtsFactory
         };
 
         // Apply properties from credentials if available
-        if (credentials != null && client != null)
+        if (credentials != null)
         {
             ApplyPropertiesFromCredentials(client, credentials);
         }

@@ -10,10 +10,10 @@ jobs:
   build-test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
 
@@ -30,7 +30,7 @@ jobs:
         run: dotnet pack src/DotNetTtsWrapper.Core/DotNetTtsWrapper.Core.csproj --configuration Release --no-build -o artifacts
 
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nuget-package
           path: artifacts/*.nupkg
