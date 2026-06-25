@@ -179,7 +179,7 @@ public class CartesiaTtsClient : HttpTtsClientBase
             output_format = new
             {
                 container = "raw",
-                encoding = "pcm_f16le",
+                encoding = "pcm_s16le",
                 sample_rate = 24000
             }
         };
@@ -214,7 +214,7 @@ public class CartesiaTtsClient : HttpTtsClientBase
 public class DeepgramTtsClient : HttpTtsClientBase
 {
     private readonly DeepgramCredentials _credentials;
-    protected override string BaseEndpoint => "https://api.deepgram.com/v1/audio";
+    protected override string BaseEndpoint => "https://api.deepgram.com/v1";
     protected override bool SupportsStreaming => true;
 
     public DeepgramTtsClient(DeepgramCredentials credentials)
@@ -243,8 +243,8 @@ public class DeepgramTtsClient : HttpTtsClientBase
         };
     }
 
-    protected override string GetSynthesisEndpoint(TtsOptions options) => "speech";
-    protected override string GetStreamingEndpoint(TtsOptions options) => "speech";
+    protected override string GetSynthesisEndpoint(TtsOptions options) => "speak";
+    protected override string GetStreamingEndpoint(TtsOptions options) => "speak";
 
     protected override async Task<List<TtsVoice>> GetVoicesFromApiAsync()
     {

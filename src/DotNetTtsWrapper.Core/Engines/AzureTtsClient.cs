@@ -20,6 +20,7 @@ public class AzureTtsClient : HttpTtsClientBase
     {
         _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
         SetApiKeyHeader("Ocp-Apim-Subscription-Key", _credentials.SubscriptionKey);
+        _httpClient.DefaultRequestHeaders.Add("X-Microsoft-OutputFormat", "audio-24khz-160kbitrate-mono-mp3");
 
         Capabilities = new EngineCapabilities
         {
@@ -106,6 +107,37 @@ public class AzureTtsClient : HttpTtsClientBase
         {
             throw new InvalidOperationException("Failed to retrieve Azure voices", ex);
         }
+    }
+
+    public override async Task<TtsSynthesisResult> SynthToBytesAsync(string text, TtsOptions? options = null)
+    {
+        var preparedText = await PrepareTextAsync(text, options);
+        var ssml = BuildSsmlForAzure(preparedText, options);
+
+        var content = new StringContent(ssml, System.Text.Encoding.UTF8, "application/ssml+xml");
+        var url = $"{BaseEndpoint}/{GetSynthesisEndpoint(options!)}";
+
+        var response = await _httpClient.PostAsync(url, content);
+        response.EnsureSuccessStatusCode();
+
+        var audioData = await response.Content.ReadAsByteArrayAsync();
+        return new TtsSynthesisResult
+        {
+            AudioData = audioData,
+            Format = AudioFormat.Mp3,
+            SampleRate = 24000,
+            Channels = 1
+        };
+    }
+
+    private string BuildSsmlForAzure(string text, TtsOptions? options)
+    {
+        if (options?.RawSsml == true || text.TrimStart().StartsWith("<speak"))
+            return text;
+
+        var voice = options?.VoiceId ?? VoiceId ?? "en-US-AriaNeural";
+        var lang = voice.Length >= 5 ? voice.Substring(0, 5) : "en-US";
+        return $"<speak version='1.0' xml:lang='{lang}'><voice name='{voice}'>{System.Security.SecurityElement.Escape(text)}</voice></speak>";
     }
 
     public override async Task<CredentialsValidationResult> CheckCredentialsAsync()
