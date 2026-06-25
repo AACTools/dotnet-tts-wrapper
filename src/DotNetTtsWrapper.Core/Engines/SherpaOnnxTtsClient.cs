@@ -286,17 +286,17 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
 
         foreach (var lang in languages)
             {
-                var langCode = lang.LangCode ?? "en";
-                var country = lang.Country ?? "";
+                var langCode = lang.EffectiveLangCode ?? "und";
+                var country = lang.EffectiveCountry ?? "";
                 var bcp47 = string.IsNullOrEmpty(country)
                     ? langCode
-                    : $"{langCode}-{country.ToUpperInvariant()}";
-                
+                    : $"{langCode}-{country.ToUpperInvariant().Split(',')[0].Trim()}";
+
                 languageCodes.Add(new LanguageInfo
                 {
                     Bcp47 = bcp47,
                     Iso639_3 = langCode,
-                    Display = lang.LanguageName ?? langCode
+                    Display = lang.EffectiveLanguageName ?? langCode
                 });
             }
 
@@ -722,9 +722,19 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
     {
         [System.Text.Json.Serialization.JsonPropertyName("lang_code")]
         public string? LangCode { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("Iso Code")]
+        public string? IsoCode { get; set; }
+
         [System.Text.Json.Serialization.JsonPropertyName("language_name")]
         public string? LanguageName { get; set; }
-        [System.Text.Json.Serialization.JsonPropertyName("country")]
+        [System.Text.Json.Serialization.JsonPropertyName("Language Name")]
+        public string? LanguageNameAlt { get; set; }
+
+        // Matches both "country" and "Country" via PropertyNameCaseInsensitive
         public string? Country { get; set; }
+
+        public string? EffectiveLangCode => LangCode ?? IsoCode;
+        public string? EffectiveLanguageName => LanguageName ?? LanguageNameAlt;
+        public string? EffectiveCountry => Country;
     }
 }
