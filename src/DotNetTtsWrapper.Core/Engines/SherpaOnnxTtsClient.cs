@@ -128,26 +128,34 @@ public class SherpaOnnxTtsClient : AbstractTtsClient
             var modelDir = !string.IsNullOrEmpty(_credentials.ModelPath)
                 ? _credentials.ModelPath
                 : Path.GetDirectoryName(_credentials.ModelFilePath) ?? "";
+            var voicesPath = Path.Combine(modelDir, "voices.bin");
+            var vocoderPath = Path.Combine(modelDir, "vocoder.onnx");
             return new ModelConfiguration
             {
                 ModelType = DetermineModelTypeFromPath(modelDir),
                 ModelPath = _credentials.ModelFilePath,
                 TokensPath = _credentials.TokensFilePath ?? Path.Combine(modelDir, "tokens.txt"),
                 DataDir = _credentials.DataDirPath ?? Path.Combine(modelDir, "espeak-ng-data"),
-                LexiconPath = _credentials.LexiconFilePath ?? Path.Combine(modelDir, "lexicon.txt")
+                LexiconPath = _credentials.LexiconFilePath ?? Path.Combine(modelDir, "lexicon.txt"),
+                VoicesPath = File.Exists(voicesPath) ? voicesPath : null,
+                VocoderPath = File.Exists(vocoderPath) ? vocoderPath : null,
             };
         }
 
         // Check if we have a custom model directory path
         if (!string.IsNullOrEmpty(_credentials.ModelPath))
         {
+            var voicesPath = Path.Combine(_credentials.ModelPath, "voices.bin");
+            var vocoderPath = Path.Combine(_credentials.ModelPath, "vocoder.onnx");
             return new ModelConfiguration
             {
                 ModelType = DetermineModelTypeFromPath(_credentials.ModelPath),
                 ModelPath = Path.Combine(_credentials.ModelPath, "model.onnx"),
                 TokensPath = Path.Combine(_credentials.ModelPath, "tokens.txt"),
                 DataDir = Path.Combine(_credentials.ModelPath, "espeak-ng-data"),
-                LexiconPath = Path.Combine(_credentials.ModelPath, "lexicon.txt")
+                LexiconPath = Path.Combine(_credentials.ModelPath, "lexicon.txt"),
+                VoicesPath = File.Exists(voicesPath) ? voicesPath : null,
+                VocoderPath = File.Exists(vocoderPath) ? vocoderPath : null,
             };
         }
 
